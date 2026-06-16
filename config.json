@@ -1,24 +1,75 @@
 {
+  "llm": {
+    "provider": "lmstudio",
+    "model": "auto",
+    "base_url": "http://localhost:1234/v1",
+    "api_key": "lm-studio-no-auth-needed",
+    "flash_model": "auto",
+    "context_length": 256000,
+    "scan_ports": [
+      1234
+    ],
+    "alt_models": {
+      "qwen3.6": {
+        "base_url": "http://localhost:1234/v1",
+        "label": "Qwen3.6 大纲策划"
+      },
+      "gemma4": {
+        "base_url": "http://localhost:1234/v1",
+        "label": "Gemma4 正文执笔"
+      },
+      "coder_next": {
+        "base_url": "http://localhost:1234/v1",
+        "label": "Coder-Next 推理"
+      }
+    },
+    "default_model": "qwen3.6",
+    "task_models": {
+      "planning": "qwen3.6",
+      "writing": "gemma4",
+      "reasoning": "coder_next"
+    }
+  },
   "workspace": {
-    "novel_name": "我在妖武乱世当仵作"
+    "novel_name": ""
   },
   "writing": {
-    "target_word_count": 7000,
-    "min_word_count": 5000,
-    "max_word_count": 9000,
-    "history_chapters_count": 3,
-    "previous_chapter_chars": 2000,
+    "target_word_count": 5000,
+    "min_word_count": 3000,
+    "max_word_count": 8000,
+    "history_chapters_count": 15,
+    "previous_chapter_chars": 4000,
     "progress_chunk_size": 1000
   },
   "review": {
-    "deep_review_enabled": true,
+    "deep_review_enabled": false,
     "auto_fix_title": true,
-    "word_count_check": true
+    "word_count_check": true,
+    "deep_review_interval": 10
   },
   "generation": {
     "temperature": 0.85,
     "max_retries": 3,
-    "timeout": 120,
+    "timeout": 180,
     "retry_delay": 5
+  },
+  "workflow": {
+    "mode": "quick"
+  },
+  "genre": "玄幻",
+  "style": "古龙风格",
+  "context_256k": {
+    "full_text_chapters": 3,
+    "detail_summary_chapters": 50,
+    "medium_summary_chapters": 150,
+    "plot_thread_vertical_tokens": 30000,
+    "character_arc_tokens": 20000,
+    "rag_retrieval_tokens": 30000,
+    "reserve_buffer_tokens": 25000
+  },
+  "performance": {
+    "entity_tracker_batch_interval": 10,
+    "story_state_shard_by_volume": true,
+    "continuity_cache_enabled": true
   }
 }

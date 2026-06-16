@@ -43,6 +43,14 @@ class BaseSkill:
         """
         return full_text
 
+    def on_post_chapter_continuity(self, chapter_id: int) -> None:
+        """
+        章节生成完毕、落盘后触发，用于连续性检查。
+        此处运行零token成本的确定性检查，结果写入 shared_state。
+        由 det_continuity_engine Skill 实现。
+        """
+        pass
+
     # =========================================================================
     # MCP 工具注册 (Tool Calling Interface)
     # =========================================================================

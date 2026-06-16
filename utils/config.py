@@ -14,15 +14,11 @@ if _config_path.exists():
     with open(_config_path, 'r', encoding='utf-8') as f:
         _config = json.load(f)
 
-# Global Settings - Support for both MiniMax and ZhipuAI
-MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY")
-MINIMAX_BASE_URL = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.chat/v1")
-MODEL_ID = os.getenv("MODEL_ID", "MiniMax-Text-01")
-FLASH_MODEL_ID = os.getenv("FLASH_MODEL_ID", "MiniMax-Text-01")
-
-# Legacy aliases for backward compatibility
-ANTHROPIC_API_KEY = MINIMAX_API_KEY
-ANTHROPIC_BASE_URL = MINIMAX_BASE_URL
+# LLM settings — now driven by config.json [llm] section + utils.llm_client
+# These are kept for backward compatibility only; llm_client.py now reads
+# config.json directly via resolve_provider() / resolve_model() etc.
+# Legacy env vars still work as overrides: NOVEL_CLAUDE_PROVIDER,
+# NOVEL_CLAUDE_MODEL, NOVEL_CLAUDE_BASE_URL, NOVEL_CLAUDE_API_KEY
 
 # Workspace Settings - read from config.json first, fallback to env
 _noval_name_from_config = _config.get("workspace", {}).get("novel_name", "")

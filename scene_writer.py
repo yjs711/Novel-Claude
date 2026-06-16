@@ -45,10 +45,10 @@ def load_volume_outline(volume_id: int) -> Optional[dict]:
 
 
 def load_previous_chapter(volume_id: int, chapter_id: int) -> Optional[str]:
-    """Load previous chapter content for context."""
+    """Load previous chapter content for context. 256K: load more."""
     if chapter_id <= 1:
         return None
-    prev_chars = get_config("writing.previous_chapter_chars", 2000)
+    prev_chars = get_config("writing.previous_chapter_chars", 4000)
     path = Path(MANUSCRIPTS_DIR) / f"vol_{volume_id:02d}" / f"ch_{chapter_id-1:03d}_final.md"
     if path.exists():
         with open(path, 'r', encoding='utf-8') as f:
@@ -58,9 +58,9 @@ def load_previous_chapter(volume_id: int, chapter_id: int) -> Optional[str]:
 
 
 def load_history_chapters(volume_id: int, chapter_id: int, count: int = None) -> str:
-    """Load multiple previous chapters for deeper context."""
+    """Load multiple previous chapters for deeper context. 256K: default 15 chapters."""
     if count is None:
-        count = get_config("writing.history_chapters_count", 3)
+        count = get_config("writing.history_chapters_count", 15)
 
     if chapter_id <= count:
         count = chapter_id - 1
@@ -148,6 +148,50 @@ def load_writing_guide(volume_id: int) -> Optional[str]:
     return None
 
 
+def _load_structured_outline_chapter(chapter_id: int) -> dict:
+    """Load per-chapter structured outline detail (scenes, beats, hooks) from 大纲.json."""
+    try:
+        config = _load_config()
+        novel_name = config.get("workspace", {}).get("novel_name", "")
+        from pathlib import Path
+        outline_path = Path(f".novel_{novel_name}" if novel_name else ".novel") / "大纲.json"
+        if not outline_path.exists():
+            return {}
+        with open(outline_path, 'r', encoding='utf-8') as f:
+            outline = json.load(f)
+        for vol in outline.get("volumes", []):
+            for ch in vol.get("chapters_list", []):
+                if ch.get("number") == chapter_id:
+                    return ch
+    except Exception:
+        pass
+    return {}
+
+
+def _load_foreshadowing_context(chapter_id: int) -> str:
+    """Load foreshadowing data relevant to this chapter."""
+    try:
+        config = _load_config()
+        novel_name = config.get("workspace", {}).get("novel_name", "")
+        from pathlib import Path
+        fs_path = Path(f".novel_{novel_name}" if novel_name else ".novel") / "伏笔.json"
+        if not fs_path.exists():
+            return ""
+        with open(fs_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        items = data.get("items", [])
+        parts = []
+        planted_here = [i for i in items if i.get("planted_in") == chapter_id and i.get("status") != "resolved"]
+        needs_resolve = [i for i in items if i.get("status") == "planted" and i.get("target_resolve", 9999) <= chapter_id]
+        if planted_here:
+            parts.append("本章需埋入的伏笔: " + ", ".join(i["description"] for i in planted_here))
+        if needs_resolve:
+            parts.append("⚠️ 本章必须回收的伏笔: " + ", ".join(f"{i['description']}(第{i['planted_in']}章埋入)" for i in needs_resolve))
+        return "\n".join(parts) if parts else ""
+    except Exception:
+        return ""
+
+
 def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None) -> str:
     """
     Generate chapter content from chapter outline using @DSL context injection.
@@ -209,14 +253,40 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
     if writing_guide:
         prompt_parts.append(f"【写作指南】:\n{writing_guide}\n")
 
+    # Inject structured outline detail (scenes, beats, hooks, foreshadowing)
+    structured_outline = _load_structured_outline_chapter(chapter_id)
+    if structured_outline:
+        detail_parts = []
+        if structured_outline.get("summary"):
+            detail_parts.append(f"【本章概要】: {structured_outline['summary']}")
+        if structured_outline.get("scenes_text") or structured_outline.get("scenes"):
+            scenes = structured_outline.get("scenes_text") or "\n".join(
+                f"场景: {s.get('name','')} | 地点: {s.get('setting','')} | 角色: {', '.join(s.get('characters_present',[]))} | 目标: {s.get('goal','')} | 冲突: {s.get('conflict','')} | 结局: {s.get('outcome','')}"
+                for s in (structured_outline.get("scenes", []) if isinstance(structured_outline.get("scenes"), list) else [])
+            )
+            detail_parts.append(f"【场景细纲】:\n{scenes}")
+        if structured_outline.get("satisfaction_beat"):
+            detail_parts.append(f"【本章爽点】: {structured_outline['satisfaction_beat']}")
+        if structured_outline.get("emotional_beat"):
+            detail_parts.append(f"【情感节奏】: {structured_outline['emotional_beat']}")
+        if structured_outline.get("ending_hook"):
+            detail_parts.append(f"【章末钩子(必须!)】: {structured_outline['ending_hook']}")
+        if detail_parts:
+            prompt_parts.append("【详细细纲 — 严格遵循】:\n" + "\n".join(detail_parts))
+
+    # Inject relevant foreshadowing
+    fs_ctx = _load_foreshadowing_context(chapter_id)
+    if fs_ctx:
+        prompt_parts.append(f"【伏笔提醒】:\n{fs_ctx}")
+
     prompt_parts.append(
         f"【写作要求】:\n"
         f"1. 必须以【章节标题】作为正文第一行（格式：# 第X章 标题名）\n"
         f"2. 开头必须承接【前章结尾】的剧情和情绪，不能突兀跳到新场景\n"
-        f"3. 严格按照章节大纲展开剧情，但要在细节上与历史章节呼应\n"
-        f"4. 参与者只能使用提供的角色、场景、组织\n"
-        f"5. 字数约6000字，不要过度水字数\n"
-        f"6. 直接输出小说正文，不要分析或总结\n\n"
+        f"3. 严格按照【详细细纲】的场景分解展开剧情\n"
+        f"4. 本章爽点必须写到位，章末钩子必须保留\n"
+        f"5. 如有伏笔提醒，务必处理\n"
+        f"6. 字数约6000字，直接输出小说正文\n\n"
         f"请开始写作：\n"
     )
 
@@ -239,7 +309,7 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
                 f.write(accumulated)
 
     # Generate content with progressive saving
-    writer = ProgressiveWriter(on_progress=on_progress, chunk_size=get_config("writing.progress_chunk_size", 1000))
+    writer = ProgressiveWriter(on_progress=on_progress, chunk_size=get_config("writing.progress_chunk_size", 1000), task="writing")
     content = writer.write(prompt, chapter_id=chapter_id)
 
     return content
@@ -482,6 +552,12 @@ def run_scene_writer(volume_id: int, start_chapter: int, end_chapter: int):
                 # Emit after scene write hook
                 beat_data = {"chapter_id": chapter_id, "beats": [], "needs_rewrite": needs_rewrite, "guidance": guidance}
                 event_bus.emit("on_after_scene_write", beat_data, content)
+
+                # Emit post-chapter continuity hook (zero-token checks)
+                event_bus.emit("on_post_chapter_continuity", chapter_id)
+
+                # Emit chapter render hook (de-AI engine)
+                event_bus.emit("on_chapter_render", content, chapter_id)
 
                 # Track entity states for this chapter
                 from core.entity_tracker import track_chapter_entities

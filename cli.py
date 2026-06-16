@@ -347,6 +347,177 @@ def skills_build(request):
     else:
         click.echo(click.style("[✗] 插件生成失败，请查看上方日志。", fg="red"))
 
+# ═══════════════════════════════════════════════════════════════════
+# V3 Fusion 新增命令 (continuity / deai / fstatus / workflow / genre)
+# ═══════════════════════════════════════════════════════════════════
+
+@cli.command()
+@click.option('--chapter', type=int, default=None, help='章节号(默认全部)')
+def continuity(chapter):
+    """零token连续性检查: 9项确定性检测"""
+    from utils.config import NOVEL_DIR
+    from core.story_state import load_story_state
+    from core.continuity_engine import run_all, summarize
+    from pathlib import Path
+
+    state_path = Path(NOVEL_DIR) / "story_state.json"
+    if not state_path.exists():
+        click.echo("[ERROR] story_state.json not found")
+        return
+
+    state = load_story_state(state_path)
+    findings = run_all(state, Path(NOVEL_DIR).parent, as_of_chapter=chapter)
+    click.echo()
+    click.echo(summarize(findings))
+    crit = [f for f in findings if f.severity == "critical"]
+    click.echo(click.style(f"\nSevere: {len(crit)}", fg="red" if crit else "green", bold=crit))
+
+@cli.command()
+@click.option('--chapter', type=int, required=True)
+def deai(chapter):
+    """去AI味检测: 五维评分 + 疲劳词统计"""
+    from utils.config import MANUSCRIPTS_DIR
+    from pathlib import Path
+    from skills.gen_deai_engine.skill import GenDeaiEngineSkill
+
+    manuscript = Path(MANUSCRIPTS_DIR)
+    content = None
+    if manuscript.exists():
+        for vd in manuscript.iterdir():
+            if vd.is_dir():
+                fp = vd / f"ch_{chapter:03d}_final.md"
+                if fp.exists():
+                    content = fp.read_text(encoding="utf-8")
+                    break
+    if not content:
+        click.echo(f"[ERROR] ch {chapter} not found")
+        return
+
+    class Ctx:
+        def get_shared(self, k, d=None): return d
+        def set_shared(self, k, v): pass
+
+    e = GenDeaiEngineSkill(Ctx())
+    e.on_init()
+    r = e.analyze(content)
+    click.echo(f"\n[DeAI] ch{chapter}: {r['overall_score']}/100")
+    for d in r["dimensions"]:
+        bar = "#"*(d["score"]//10) + "-"*(10-d["score"]//10)
+        click.echo(f"  {d['name']:8s} {bar} {d['score']}")
+    if r.get("suggestions"):
+        click.echo(); [click.echo(f"  -> {s}") for s in r["suggestions"]]
+    click.echo()
+
+@cli.command()
+def fstatus():
+    """系统状态: 角色+剧情线+章节进度"""
+    from utils.config import NOVEL_DIR
+    from core.story_state import load_story_state, current_chapter
+    from pathlib import Path
+
+    sp = Path(NOVEL_DIR) / "story_state.json"
+    if not sp.exists():
+        click.echo("[INFO] No StoryState yet")
+        return
+
+    s = load_story_state(sp)
+    cur = current_chapter(s)
+    click.echo(f"\n{s.title or '?'} | {s.genre or '?'} | ch{cur}")
+    click.echo(f"chars:{len(s.characters)} threads:{len(s.plot_threads)} done:{sum(1 for c in s.chapters.values() if c.status!='planned')}")
+    if s.characters:
+        click.echo("chars: " + ", ".join(f"{c.full_name}({c.role})" for c in list(s.characters.values())[:5]))
+    click.echo()
+
+@cli.command()
+@click.argument('mode', type=click.Choice(['quick','standard','deep']), required=False, default=None)
+def workflow(mode):
+    """工作流模式: quick/standard/deep"""
+    import json; from pathlib import Path
+
+    VALID = ['quick', 'standard', 'deep']
+    if not mode:
+        cp = Path(__file__).parent / "config.json"
+        with open(cp, "r", encoding="utf-8") as f: cfg = json.load(f)
+        current = cfg.get("workflow", {}).get("mode", "quick")
+        click.echo(f"Usage: cli.py workflow <{'|'.join(VALID)}>  [current: {current}]")
+        return
+
+    cp = Path(__file__).parent / "config.json"
+    with open(cp, "r", encoding="utf-8") as f: cfg = json.load(f)
+    cfg.setdefault("workflow", {})["mode"] = mode
+    with open(cp, "w", encoding="utf-8") as f: json.dump(cfg, f, ensure_ascii=False, indent=2)
+    click.echo(f"[OK] workflow={mode}")
+
+@cli.command()
+@click.argument('genre', type=str, required=False, default=None)
+def genre(genre):
+    """切换流派: 玄幻/修仙/都市/言情/悬疑/历史/科幻/游戏/无限流/轻小说"""
+    from skills.gen_genre_tags.skill import GENRE_DB
+    import json; from pathlib import Path
+
+    if not genre:
+        click.echo(f"Usage: cli.py genre <流派>\nAvailable: {', '.join(GENRE_DB.keys())}")
+        return
+    if genre not in GENRE_DB:
+        click.echo(f"Unknown. Available: {', '.join(GENRE_DB.keys())}")
+        return
+    cp = Path(__file__).parent / "config.json"
+    with open(cp, "r", encoding="utf-8") as f: cfg = json.load(f)
+    cfg["genre"] = genre
+    with open(cp, "w", encoding="utf-8") as f: json.dump(cfg, f, ensure_ascii=False, indent=2)
+    click.echo(f"[OK] genre={genre}: {GENRE_DB[genre]['pacingStrategy']}")
+
+@cli.command()
+@click.argument('style', type=str, required=False, default=None)
+def style(style):
+    """切换写作风格: 金庸武侠/古龙风格/网文爽文/纯文学/轻小说/硬核科幻/黑色幽默/暗黑哥特/现代极简"""
+    from skills.gen_writing_style.skill import STYLE_DB
+    import json; from pathlib import Path
+
+    if not style:
+        click.echo(f"Usage: cli.py style <风格>\nAvailable: {', '.join(STYLE_DB.keys())}")
+        return
+    if style not in STYLE_DB:
+        click.echo(f"Unknown. Available: {', '.join(STYLE_DB.keys())}")
+        return
+    cp = Path(__file__).parent / "config.json"
+    with open(cp, "r", encoding="utf-8") as f: cfg = json.load(f)
+    cfg["style"] = style
+    with open(cp, "w", encoding="utf-8") as f: json.dump(cfg, f, ensure_ascii=False, indent=2)
+    click.echo(f"[OK] style={style}: {STYLE_DB[style]['narrativeDistance']}")
+
+@cli.command()
+@click.option('--name', type=str, default='my_style')
+def extract_formula(name):
+    """从最新章提取写法特征并保存"""
+    from utils.config import MANUSCRIPTS_DIR, NOVEL_DIR
+    from pathlib import Path
+    from skills.wf_writing_formula.skill import WfWritingFormulaSkill
+
+    manuscript = Path(MANUSCRIPTS_DIR)
+    text = None
+    all_f = []
+    if manuscript.exists():
+        for vd in manuscript.iterdir():
+            if vd.is_dir(): all_f.extend(vd.glob("ch_*_final.md"))
+    if all_f:
+        text = sorted(all_f)[-1].read_text(encoding="utf-8")
+        click.echo(f"Extracting from: {sorted(all_f)[-1].name}")
+
+    if not text:
+        click.echo("[ERROR] No chapter found"); return
+
+    class Ctx:
+        def __init__(self): self.ss = {}
+        def get_shared(self, k, d=None): return self.ss.get(k, d)
+        def set_shared(self, k, v): self.ss[k] = v
+    ctx = Ctx(); ctx.workspace = type('o',(),{'NOVEL_DIR': NOVEL_DIR})()
+    e = WfWritingFormulaSkill(ctx); e.on_init()
+    f = e.extract_formula(text, name)
+    click.echo(f"[OK] formula '{name}': avg_sent={f['features'].get('avg_sentence_length',0):.0f}chars, dialog={f['features'].get('dialogue_ratio',0):.0%}")
+
+# ═══════════════════════════════════════════════════════════════════
+
 if __name__ == '__main__':
     try:
         cli()
