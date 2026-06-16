@@ -21,6 +21,18 @@
       "coder_next": {
         "base_url": "http://localhost:1234/v1",
         "label": "Coder-Next 推理"
+      },
+      "qwen3-coder-30b": {
+        "base_url": "http://localhost:1234/v1",
+        "label": "Coder-30B 编程"
+      },
+      "gpt-oss-120b": {
+        "base_url": "http://localhost:1234/v1",
+        "label": "GPT-OSS 超大杯"
+      },
+      "qwen3.6-uncensored-aggressive": {
+        "base_url": "http://localhost:1234/v1",
+        "label": "Qwen3.6 激进无审查"
       }
     },
     "default_model": "qwen3.6",
