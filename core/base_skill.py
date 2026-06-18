@@ -51,6 +51,14 @@ class BaseSkill:
         """
         pass
 
+    def on_after_chapter_complete(self, chapter_id: int, full_text: str) -> None:
+        """
+        整章生成完毕、合并落盘后触发。
+        用于沉淀提取 / 追读力评估 / 质量评分。
+        full_text 为整章合并后的完整文本。
+        """
+        pass
+
     # =========================================================================
     # MCP 工具注册 (Tool Calling Interface)
     # =========================================================================

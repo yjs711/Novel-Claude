@@ -192,6 +192,108 @@ def _load_foreshadowing_context(chapter_id: int) -> str:
         return ""
 
 
+def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = None,
+                         overview: str = None, entities: dict = None) -> str:
+    """Build the full writing prompt for a chapter. Shared between CLI and WebUI.
+    All parameters are optional — if not provided, they are loaded from disk."""
+    # Load from disk if not provided
+    if chapter_title is None or overview is None:
+        outline = load_chapter_outline(volume_id, chapter_id)
+        if outline:
+            chapter_title = chapter_title or outline.get("title", f"第{chapter_id}章")
+            overview = overview or outline.get("overview", "")
+            entity_list = outline.get("entity_list", [])
+        else:
+            chapter_title = chapter_title or f"第{chapter_id}章"
+            overview = overview or ""
+            entity_list = []
+
+    if entities is None:
+        entities = load_entity_cards(entity_list)
+
+    world_setting = load_world_setting()
+    prev_chapter = load_previous_chapter(volume_id, chapter_id)
+    history_chapters = load_history_chapters(volume_id, chapter_id, count=3)
+    next_outline = load_next_chapter_outline(volume_id, chapter_id)
+    writing_guide = load_writing_guide(volume_id)
+
+    # Build prompt
+    prompt_parts = []
+    # Inject 写作技巧 + 叙事手法（正文不注入市场趋势，按大纲细纲走）
+    try:
+        for fname in ["bilibili-writing-crash-course.md", "narrative-pov-immersion.md"]:
+            ref_path = Path(__file__).parent / "prompts" / fname
+            if ref_path.exists():
+                ref_text = ref_path.read_text(encoding="utf-8")
+                prompt_parts.append(f"【写作技巧参考】:\n{ref_text}\n")
+    except Exception:
+        pass
+
+    prompt_parts.extend([
+        f"【章节大纲】:\n标题：{chapter_title}\n概述：{overview}\n",
+        f"【参与者实体】:\n角色：{json.dumps(entities.get('characters',[]), ensure_ascii=False, indent=2)}\n",
+        f"【场景】: {json.dumps(entities.get('scenes',[]), ensure_ascii=False, indent=2)}\n",
+        f"【组织】: {json.dumps(entities.get('organizations',[]), ensure_ascii=False, indent=2)}\n",
+    ])
+
+    if world_setting:
+        content = world_setting.get("content", world_setting)
+        prompt_parts.append(f"【世界观设定】:\n{content.get('world_view', '')}\n")
+        prompt_parts.append(f"【势力】:\n{json.dumps(content.get('major_power_camps', []), ensure_ascii=False, indent=2)}\n")
+
+    if history_chapters:
+        prompt_parts.append(f"【历史章节剧情回顾】:\n{history_chapters}\n")
+
+    if prev_chapter:
+        prompt_parts.append(f"【前章结尾】:\n{prev_chapter}\n")
+
+    if next_outline:
+        next_title = next_outline.get("title", "")
+        next_overview = next_outline.get("overview", "")
+        prompt_parts.append(f"【下一章预告】:\n{next_title}：{next_overview}\n")
+
+    if writing_guide:
+        prompt_parts.append(f"【写作指南】:\n{writing_guide}\n")
+
+    # Structured outline detail
+    structured_outline = _load_structured_outline_chapter(chapter_id)
+    if structured_outline:
+        detail_parts = []
+        if structured_outline.get("summary"):
+            detail_parts.append(f"【本章概要】: {structured_outline['summary']}")
+        if structured_outline.get("scenes_text") or structured_outline.get("scenes"):
+            scenes = structured_outline.get("scenes_text") or "\n".join(
+                f"场景: {s.get('name','')} | 地点: {s.get('setting','')} | 角色: {', '.join(s.get('characters_present',[]))} | 目标: {s.get('goal','')} | 冲突: {s.get('conflict','')} | 结局: {s.get('outcome','')}"
+                for s in (structured_outline.get("scenes", []) if isinstance(structured_outline.get("scenes"), list) else [])
+            )
+            detail_parts.append(f"【场景细纲】:\n{scenes}")
+        if structured_outline.get("satisfaction_beat"):
+            detail_parts.append(f"【本章爽点】: {structured_outline['satisfaction_beat']}")
+        if structured_outline.get("emotional_beat"):
+            detail_parts.append(f"【情感节奏】: {structured_outline['emotional_beat']}")
+        if structured_outline.get("ending_hook"):
+            detail_parts.append(f"【章末钩子(必须!)】: {structured_outline['ending_hook']}")
+        if detail_parts:
+            prompt_parts.append("【详细细纲 — 严格遵循】:\n" + "\n".join(detail_parts))
+
+    fs_ctx = _load_foreshadowing_context(chapter_id)
+    if fs_ctx:
+        prompt_parts.append(f"【伏笔提醒】:\n{fs_ctx}")
+
+    prompt_parts.append(
+        f"【写作要求】:\n"
+        f"1. 必须以【章节标题】作为正文第一行（格式：# 第X章 标题名）\n"
+        f"2. 开头必须承接【前章结尾】的剧情和情绪，不能突兀跳到新场景\n"
+        f"3. 严格按照【详细细纲】的场景分解展开剧情\n"
+        f"4. 本章爽点必须写到位，章末钩子必须保留\n"
+        f"5. 如有伏笔提醒，务必处理\n"
+        f"6. 字数约6000字，直接输出小说正文\n\n"
+        f"请开始写作：\n"
+    )
+
+    return "\n".join(prompt_parts)
+
+
 def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None) -> str:
     """
     Generate chapter content from chapter outline using @DSL context injection.
@@ -213,84 +315,11 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
     print(f"  概述: {overview[:50]}...")
     print(f"  参与者: {', '.join(entity_list)}")
 
-    # Load context entities
+    # Load entities for display
     entities = load_entity_cards(entity_list)
-    world_setting = load_world_setting()
-    prev_chapter = load_previous_chapter(volume_id, chapter_id)
-    history_chapters = load_history_chapters(volume_id, chapter_id, count=3)
-    next_outline = load_next_chapter_outline(volume_id, chapter_id)
-    writing_guide = load_writing_guide(volume_id)
 
-    # Build prompt with @DSL context
-    prompt_parts = [
-        f"【章节大纲】:\n标题：{chapter_title}\n概述：{overview}\n",
-        f"【参与者实体】:\n角色：{json.dumps(entities['characters'], ensure_ascii=False, indent=2)}\n",
-        f"【场景】: {json.dumps(entities['scenes'], ensure_ascii=False, indent=2)}\n",
-        f"【组织】: {json.dumps(entities['organizations'], ensure_ascii=False, indent=2)}\n",
-    ]
-
-    # Add world setting
-    if world_setting:
-        content = world_setting.get("content", world_setting)
-        prompt_parts.append(f"【世界观设定】:\n{content.get('world_view', '')}\n")
-        prompt_parts.append(f"【势力】:\n{json.dumps(content.get('major_power_camps', []), ensure_ascii=False, indent=2)}\n")
-
-    # Add history chapters context (last 3 chapters)
-    if history_chapters:
-        prompt_parts.append(f"【历史章节剧情回顾】:\n{history_chapters}\n")
-
-    # Add previous chapter context (immediate preceding chapter)
-    if prev_chapter:
-        prompt_parts.append(f"【前章结尾】:\n{prev_chapter}\n")
-
-    # Add next chapter outline for continuity
-    if next_outline:
-        next_title = next_outline.get("title", "")
-        next_overview = next_outline.get("overview", "")
-        prompt_parts.append(f"【下一章预告】:\n{next_title}：{next_overview}\n")
-
-    # Add writing guide
-    if writing_guide:
-        prompt_parts.append(f"【写作指南】:\n{writing_guide}\n")
-
-    # Inject structured outline detail (scenes, beats, hooks, foreshadowing)
-    structured_outline = _load_structured_outline_chapter(chapter_id)
-    if structured_outline:
-        detail_parts = []
-        if structured_outline.get("summary"):
-            detail_parts.append(f"【本章概要】: {structured_outline['summary']}")
-        if structured_outline.get("scenes_text") or structured_outline.get("scenes"):
-            scenes = structured_outline.get("scenes_text") or "\n".join(
-                f"场景: {s.get('name','')} | 地点: {s.get('setting','')} | 角色: {', '.join(s.get('characters_present',[]))} | 目标: {s.get('goal','')} | 冲突: {s.get('conflict','')} | 结局: {s.get('outcome','')}"
-                for s in (structured_outline.get("scenes", []) if isinstance(structured_outline.get("scenes"), list) else [])
-            )
-            detail_parts.append(f"【场景细纲】:\n{scenes}")
-        if structured_outline.get("satisfaction_beat"):
-            detail_parts.append(f"【本章爽点】: {structured_outline['satisfaction_beat']}")
-        if structured_outline.get("emotional_beat"):
-            detail_parts.append(f"【情感节奏】: {structured_outline['emotional_beat']}")
-        if structured_outline.get("ending_hook"):
-            detail_parts.append(f"【章末钩子(必须!)】: {structured_outline['ending_hook']}")
-        if detail_parts:
-            prompt_parts.append("【详细细纲 — 严格遵循】:\n" + "\n".join(detail_parts))
-
-    # Inject relevant foreshadowing
-    fs_ctx = _load_foreshadowing_context(chapter_id)
-    if fs_ctx:
-        prompt_parts.append(f"【伏笔提醒】:\n{fs_ctx}")
-
-    prompt_parts.append(
-        f"【写作要求】:\n"
-        f"1. 必须以【章节标题】作为正文第一行（格式：# 第X章 标题名）\n"
-        f"2. 开头必须承接【前章结尾】的剧情和情绪，不能突兀跳到新场景\n"
-        f"3. 严格按照【详细细纲】的场景分解展开剧情\n"
-        f"4. 本章爽点必须写到位，章末钩子必须保留\n"
-        f"5. 如有伏笔提醒，务必处理\n"
-        f"6. 字数约6000字，直接输出小说正文\n\n"
-        f"请开始写作：\n"
-    )
-
-    prompt = "\n".join(prompt_parts)
+    # Build prompt using shared function
+    prompt = build_chapter_prompt(volume_id, chapter_id, chapter_title, overview, entities)
 
     # Emit hook for skill injection
     beat_data = {"chapter_id": chapter_id, "title": chapter_title, "overview": overview}
@@ -559,6 +588,9 @@ def run_scene_writer(volume_id: int, start_chapter: int, end_chapter: int):
                 # Emit chapter render hook (de-AI engine)
                 event_bus.emit("on_chapter_render", content, chapter_id)
 
+                # Emit chapter complete hook (memory sedimentation, retention, quality)
+                event_bus.emit("on_after_chapter_complete", chapter_id, content)
+
                 # Track entity states for this chapter
                 from core.entity_tracker import track_chapter_entities
                 track_chapter_entities(volume_id, chapter_id)
@@ -580,62 +612,6 @@ def run_scene_writer(volume_id: int, start_chapter: int, end_chapter: int):
 
 
 # ============================================================================
-# Continuation Support (for later use)
-# ============================================================================
-
-def continue_chapter(volume_id: int, chapter_id: int, target_words: int = 3000) -> str:
-    """
-    Continue writing a chapter to reach target word count.
-    Used for continuation mode similar to NovelForge's extension feature.
-    """
-    # Load current chapter content
-    path = Path(MANUSCRIPTS_DIR) / f"vol_{volume_id:02d}" / f"ch_{chapter_id:03d}_final.md"
-    if not path.exists():
-        print(f"[ERROR] 找不到章节文件: {path}")
-        return ""
-
-    with open(path, 'r', encoding='utf-8') as f:
-        current_content = f.read()
-
-    current_words = len(current_content)
-    if current_words >= target_words:
-        print(f"[INFO] 章节字数已达标 ({current_words} >= {target_words})")
-        return current_content
-
-    remaining = target_words - current_words
-    print(f"[INFO] 续写章节，目标增加约 {remaining} 字...")
-
-    # Load chapter outline for context
-    outline = load_chapter_outline(volume_id, chapter_id)
-    next_outline = load_next_chapter_outline(volume_id, chapter_id)
-
-    # Build continuation prompt
-    prompt_parts = [
-        f"【当前章节内容】:\n{current_content[-1000:]}\n",
-        f"【章节大纲】:\n{outline.get('overview', '')}\n",
-    ]
-
-    if next_outline:
-        prompt_parts.append(f"【下一章预告】:\n{next_outline.get('title', '')}: {next_outline.get('overview', '')}\n")
-
-    prompt_parts.append(
-        f"【续写要求】:\n"
-        f"请继续上一段的剧情，续写约 {remaining} 字。\n"
-        f"保持与前文的风格和节奏一致。\n"
-        f"直接输出续写内容，不要分析。\n"
-    )
-
-    prompt = "\n".join(prompt_parts)
-
-    # Generate continuation
-    continuation = generate_stream(prompt)
-
-    # Combine and save
-    new_content = current_content + "\n\n" + continuation
-    save_chapter_content(volume_id, chapter_id, new_content)
-
-    return new_content
-
 
 # ============================================================================
 # Batch Mode (for compatibility)

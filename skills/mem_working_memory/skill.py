@@ -137,6 +137,17 @@ class MemWorkingMemorySkill(BaseSkill):
                 names = ", ".join(f"{c.full_name}({c.role})" for c in supp[:8])
                 parts.append(f"  配角: {names}")
 
+            # ── 认知状态注入（Epistemic State） ──
+            # 防止角色"重新发现"已知信息
+            all_chars = list(main) + list(supp)
+            knowledge_lines = []
+            for c in all_chars:
+                if c.knowledge:
+                    known = c.knowledge[-10:]  # Last 10 known facts
+                    knowledge_lines.append(f"  {c.full_name}已知: {'; '.join(known)}")
+            if knowledge_lines:
+                parts.append("\n[角色已知信息 — 避免重复发现]\n" + "\n".join(knowledge_lines))
+
         # 活跃剧情线
         active = [t for t in story_state.plot_threads.values() if t.status == "active"]
         if active:
