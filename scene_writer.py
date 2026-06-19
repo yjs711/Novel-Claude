@@ -268,7 +268,7 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
 
     # Minimal constraints — the model needs freedom, not a rulebook
     prompt_parts.append(
-        "【要求】承接前章情绪，完成爽点，埋好钩子。约6000字。直接输出正文。\n"
+        "【要求】承接前章情绪，本章至少有一个爽点/钩子。约2000字。直接输出正文。\n"
     )
 
     return "\n".join(prompt_parts)
