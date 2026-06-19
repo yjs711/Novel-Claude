@@ -478,33 +478,82 @@ textarea { resize: vertical; }
     <button class="panel-toggle" onclick="togglePanel('panelRight2')">&#9776;</button>
   </div>
   <div class="panel-body">
-    <!-- Module: 钩子工厂 -->
+    <!-- Module 1: 剧情推演器 -->
     <div class="inspire-module">
       <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 钩子工厂
+        <span class="arrow">&#9660;</span> 剧情推演器
       </div>
       <div class="inspire-body">
-        <textarea id="hookInput" placeholder="输入关键词或留空让AI自由发挥..."></textarea>
+        <textarea id="propelInput" placeholder="输入当前剧情状态，如：主角刚在山洞里拿到秘籍，但洞口塌了，外面仇家正在搜山..."></textarea>
         <div class="btn-row">
-          <button class="btn-primary btn-sm" onclick="generateHook()">生成钩子</button>
+          <button class="btn-primary btn-sm" onclick="generatePropels()">推演3条走向</button>
+        </div>
+        <div class="output-box" id="propelOutput"></div>
+      </div>
+    </div>
+    <!-- Module 2: 视角切换器 -->
+    <div class="inspire-module">
+      <div class="inspire-header" onclick="toggleInspireModule(this)">
+        <span class="arrow">&#9660;</span> 视角切换器
+      </div>
+      <div class="inspire-body">
+        <select id="povSwitcher" style="width:100%;margin-bottom:6px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px">
+          <option value="sidekick">配角迪化 — 小弟脑补主角深不可测</option>
+          <option value="villain">反派视角 — 反派策划阴谋，烘托危机</option>
+          <option value="bystander">旁观者 — 路人见证主角造成的轰动</option>
+          <option value="neutral">中间派 — 摇摆角色的立场变化</option>
+        </select>
+        <textarea id="povInput" placeholder="粘贴一段正文，AI用选定视角重写..."></textarea>
+        <div class="btn-row">
+          <button class="btn-primary btn-sm" onclick="generatePOV()">切换视角重写</button>
+        </div>
+        <div class="output-box" id="povOutput"></div>
+      </div>
+    </div>
+    <!-- Module 3: 冲突注入器 -->
+    <div class="inspire-module">
+      <div class="inspire-header" onclick="toggleInspireModule(this)">
+        <span class="arrow">&#9660;</span> 冲突注入器
+      </div>
+      <div class="inspire-body">
+        <div class="btn-row" style="flex-wrap:wrap">
+          <button class="btn-secondary btn-sm" onclick="injectConflict('secret')">曝光秘密</button>
+          <button class="btn-secondary btn-sm" onclick="injectConflict('enemy')">引入新敌</button>
+          <button class="btn-secondary btn-sm" onclick="injectConflict('crisis')">限时危机</button>
+          <button class="btn-secondary btn-sm" onclick="injectConflict('betray')">盟友反水</button>
+        </div>
+        <div class="output-box" id="conflictOutput" style="margin-top:6px"></div>
+      </div>
+    </div>
+    <!-- Module 4: 钩子工坊（上下文感知） -->
+    <div class="inspire-module">
+      <div class="inspire-header" onclick="toggleInspireModule(this)">
+        <span class="arrow">&#9660;</span> 钩子工坊
+      </div>
+      <div class="inspire-body">
+        <div class="btn-row">
+          <button class="btn-secondary btn-sm" onclick="generateHook('action')">行动预告型</button>
+          <button class="btn-secondary btn-sm" onclick="generateHook('suspense')">悬念型</button>
+          <button class="btn-secondary btn-sm" onclick="generateHook('twist')">反转预告型</button>
+          <button class="btn-primary btn-sm" onclick="generateHook('auto')" style="margin-left:4px">智能生成</button>
         </div>
         <div class="output-box" id="hookOutput"></div>
       </div>
     </div>
-    <!-- Module: 章节构思 -->
+    <!-- Module 5: 剧情翻新器 -->
     <div class="inspire-module">
       <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 章节构思
+        <span class="arrow">&#9660;</span> 剧情翻新器
       </div>
       <div class="inspire-body">
-        <textarea id="ideaInput" placeholder="输入你的章节想法..."></textarea>
+        <textarea id="flipInput" placeholder="输入一个经典剧情模式，如：英雄救美后被拖下水..."></textarea>
         <div class="btn-row">
-          <button class="btn-primary btn-sm" onclick="generateIdea()">展开细纲</button>
+          <button class="btn-primary btn-sm" onclick="generateFlip()">翻转翻新</button>
         </div>
-        <div class="output-box" id="ideaOutput"></div>
+        <div class="output-box" id="flipOutput"></div>
       </div>
     </div>
-    <!-- Module: 质量仪表 -->
+    <!-- Module 6: 质量仪表 -->
     <div class="inspire-module">
       <div class="inspire-header" onclick="toggleInspireModule(this)">
         <span class="arrow">&#9660;</span> 质量仪表
@@ -519,7 +568,7 @@ textarea { resize: vertical; }
         </div>
       </div>
     </div>
-    <!-- Module: AI对话 -->
+    <!-- Module 7: AI对话 -->
     <div class="inspire-module">
       <div class="inspire-header" onclick="toggleInspireModule(this)">
         <span class="arrow">&#9660;</span> AI对话
@@ -1406,44 +1455,111 @@ function generateForeshadow() {
 }
 
 // ── Inspire modules ──
-function generateHook() {
-  var input = el('hookInput');
-  var out = el('hookOutput');
+// ── Module 1: 剧情推演器 ──
+function generatePropels() {
+  var input = el('propelInput');
+  var out = el('propelOutput');
+  if (!out) return;
+  var situation = input && input.value.trim() ? input.value.trim() : '';
+  if (!situation) { showToast('请输入当前剧情状态', true); return; }
+  var genre = el('selGenre') ? el('selGenre').value : '玄幻';
+  out.textContent = 'AI 推演中...';
+  llamaStream([
+    {role: 'system', content: '你是网文创作顾问。根据作者给出的当前剧情状态，推演3条可能的剧情发展方向。每条带一句简短理由，基于当前体裁(' + genre + ')的故事逻辑。用编号列出。'},
+    {role: 'user', content: '当前状态：' + situation + '\n请给出3条剧情发展方向：'}
+  ], function(token) {
+    if (out.textContent === 'AI 推演中...') out.textContent = '';
+    out.textContent += token;
+  }, function() { showToast('推演完成'); },
+  function(err) { showToast('推演失败: ' + err, true); });
+}
+
+// ── Module 2: 视角切换器 ──
+function generatePOV() {
+  var input = el('povInput');
+  var sel = el('povSwitcher');
+  var out = el('povOutput');
+  if (!out || !input) return;
+  var text = input.value.trim();
+  if (!text) { showToast('请粘贴一段正文', true); return; }
+  var povMap = {sidekick:'配角的视角——他对主角的行为进行脑补，觉得主角深不可测、每一步都有深意',villain:'反派的视角——他在策划阴谋，如何对付主角、制造危机',bystander:'路人的视角——他偶然见证了主角造成的轰动效应，震惊不已',neutral:'摇摆角色的视角——他的立场正在变化，内心充满矛盾和算计'};
+  var pov = sel ? (povMap[sel.value] || povMap.sidekick) : povMap.sidekick;
+  out.textContent = '切换视角中...';
+  llamaStream([
+    {role: 'system', content: '你是小说家。用' + pov + '。用该视角重写用户提供的段落。保持原文的核心事件不变，但从新视角人物的眼睛去看、去感受、去反应。写200-400字。'},
+    {role: 'user', content: '原文：\n' + text.substring(0, 1500) + '\n\n请用选定视角重写：'}
+  ], function(token) {
+    if (out.textContent === '切换视角中...') out.textContent = '';
+    out.textContent += token;
+  }, function() { showToast('视角切换完成'); },
+  function(err) { showToast('视角切换失败: ' + err, true); });
+}
+
+// ── Module 3: 冲突注入器 ──
+function injectConflict(type) {
+  var out = el('conflictOutput');
   if (!out) return;
   var genre = el('selGenre') ? el('selGenre').value : '玄幻';
-  var prompt = input && input.value ? input.value : '';
+  var conflictMap = {
+    secret: {title:'曝光秘密', prompt:'主角的金手指或隐藏身份被意外撞破。写出这个意外发生的场景（谁撞破了？在什么情况下？），以及主角的即时反应。200-300字。'},
+    enemy: {title:'引入新敌', prompt:'一个突然出现的新敌人针对主角。写出这个敌人的第一次出场——他的动机、他的能力、他为什么针对主角。200-300字。'},
+    crisis: {title:'限时危机', prompt:'主角面临一个有时限的紧急任务。写出这个危机的来源、倒计时的压迫感、主角的第一反应。200-300字。'},
+    betray: {title:'盟友反水', prompt:'一个重要配角突然背叛主角。写出背叛发生的那一刻——主角的反应、背叛者的台词、背后的动机。200-300字。'}
+  };
+  var c = conflictMap[type] || conflictMap.secret;
   out.textContent = '生成中...';
   llamaStream([
-    {role: 'system', content: '你是一个专业的网文创作顾问，擅长生成章节钩子和开篇创意。当前体裁：' + genre},
-    {role: 'user', content: prompt || '请生成3个吸引人的章节开头钩子，每个50字以内。'}
+    {role: 'system', content: '你是网文创作顾问。基于当前体裁(' + genre + ')，写一段具体场景。场景中不要用概括性描述，要用具体的动作、对话和环境细节来呈现冲突。'},
+    {role: 'user', content: c.prompt}
   ], function(token) {
     if (out.textContent === '生成中...') out.textContent = '';
     out.textContent += token;
-  }, function() {
-    showToast('钩子生成完成');
-  }, function(err) {
-    showToast('生成失败: ' + err, true);
-  });
+  }, function() { showToast(c.title + ' — 已生成'); },
+  function(err) { showToast('生成失败: ' + err, true); });
 }
 
-function generateIdea() {
-  var input = el('ideaInput');
-  var out = el('ideaOutput');
+// ── Module 4: 钩子工坊（上下文感知） ──
+function generateHook(type) {
+  var out = el('hookOutput');
   if (!out) return;
-  var idea = input ? input.value : '';
-  if (!idea) { showToast('请输入你的想法', true); return; }
-  out.textContent = '展开中...';
+  var genre = el('selGenre') ? el('selGenre').value : '玄幻';
+  var context = el('editorTextarea') ? el('editorTextarea').value.substring(el('editorTextarea').value.length - 500) : '';
+  var hookMap = {
+    action: '生成3个"行动预告型"章末钩子——告诉读者主角下一步要做什么大事，制造期待。每个50字以内。',
+    suspense: '生成3个"悬念型"章末钩子——透露一个危险或秘密正在逼近，但不揭示真相。每个50字以内。',
+    twist: '生成3个"反转预告型"章末钩子——暗示接下来会有一个意想不到的转折。每个50字以内。',
+    auto: '生成3个最合适的章末钩子，混合行动预告、悬念和反转。每个50字以内。'
+  };
+  var prompt = hookMap[type] || hookMap.auto;
+  if (context && context.length > 50) prompt += '\n当前章节末尾内容：' + context.substring(context.length - 300);
+  out.textContent = '生成钩子...';
   llamaStream([
-    {role: 'system', content: '你是一个专业的网文创作顾问，擅长展开章节构思为详细细纲。'},
-    {role: 'user', content: '请展开以下章节构思为详细的细纲（300-500字）：\n' + idea}
+    {role: 'system', content: '你是网文创作顾问，擅长写章节末尾的钩子。当前体裁：' + genre + '。钩子要简短有力，制造期待感。'},
+    {role: 'user', content: prompt}
   ], function(token) {
-    if (out.textContent === '展开中...') out.textContent = '';
+    if (out.textContent === '生成钩子...') out.textContent = '';
     out.textContent += token;
-  }, function() {
-    showToast('构思展开完成');
-  }, function(err) {
-    showToast('生成失败: ' + err, true);
-  });
+  }, function() { showToast('钩子生成完成'); },
+  function(err) { showToast('生成失败: ' + err, true); });
+}
+
+// ── Module 5: 剧情翻新器 ──
+function generateFlip() {
+  var input = el('flipInput');
+  var out = el('flipOutput');
+  if (!out) return;
+  var pattern = input && input.value.trim() ? input.value.trim() : '';
+  if (!pattern) { showToast('请输入一个经典剧情模式', true); return; }
+  var genre = el('selGenre') ? el('selGenre').value : '玄幻';
+  out.textContent = '翻新中...';
+  llamaStream([
+    {role: 'system', content: '你是网文创作顾问。把经典剧情模式进行翻新：保留核心冲突框架，但翻转2-3个关键要素（比如好人变坏人、陷阱变机遇、弱者变强者），给出一个全新的剧情版本。200-400字。基于当前体裁：' + genre},
+    {role: 'user', content: '经典模式：' + pattern + '\n请给出翻新后的剧情：'}
+  ], function(token) {
+    if (out.textContent === '翻新中...') out.textContent = '';
+    out.textContent += token;
+  }, function() { showToast('翻新完成'); },
+  function(err) { showToast('翻新失败: ' + err, true); });
 }
 
 function loadQualityGate() {
