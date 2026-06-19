@@ -351,6 +351,25 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
     except Exception:
         pass  # Non-critical, don't block generation
 
+    # Inject storyform constraints (NCP v1.3.0 — structural narrative argument)
+    try:
+        from core.storyform import Storyform
+        from utils.config_loader import get_config
+        novel_name = get_config("workspace.novel_name", default="")
+        sf_path = Path(".novel") / f"{novel_name}" / "storyform.json" if novel_name else None
+        if not sf_path or not sf_path.exists():
+            sf_path = Path(".novel") / "storyform.json"
+        if sf_path.exists():
+            import json
+            sf_data = json.loads(sf_path.read_text(encoding="utf-8"))
+            sf = Storyform.from_dict(sf_data)
+            sf_context = sf.to_writing_context()
+            if sf_context:
+                prompt += sf_context
+                print(f"  [OK] Storyform (NCP) constraints injected")
+    except Exception:
+        pass  # Non-critical
+
     # Emit hook for skill injection
     beat_data = {"chapter_id": chapter_id, "title": chapter_title, "overview": overview}
     prompt_parts = [prompt]
