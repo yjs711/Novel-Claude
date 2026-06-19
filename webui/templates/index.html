@@ -828,32 +828,90 @@ function loadStoryEngine() {
 }
 
 // ── loadChapterList ──
+var _chapterPage = 0, _chapterHasMore = false, _chapterObserver = null;
 function loadChapterList() {
-  apiGet('/api/chapters').then(function(r) {
+  _chapterPage = 1;
+  apiGet('/api/chapters?page=1&size=50').then(function(r) {
     if (!r) return;
-    // r is array of volumes with chapters
     var cl = el('chapterList');
     if (!cl) return;
-    var html = '';
-    if (Array.isArray(r)) {
-      for (var v = 0; v < r.length; v++) {
-        var vol = r[v];
-        var volLabel = vol.volume || ('第' + (v + 1) + '卷');
-        html += '<div class="vol-header">' + escHtml(volLabel) + '</div>';
-        var chs = vol.chapters || [];
-        for (var c = 0; c < chs.length; c++) {
-          var ch = chs[c];
-          var chNum = ch.num || (c + 1);
-          html += '<div class="chapter-item" onclick="loadChapter(\'' + escHtml(vol.volume || 'vol_01') + '\',' + chNum + ')">';
-          html += '<span class="ch-num">#' + chNum + '</span>';
-          html += '<span class="ch-title">' + escHtml(ch.title || '') + '</span>';
-          html += '<span class="ch-words">' + (ch.words || 0) + '字</span>';
-          html += '</div>';
-        }
-      }
+    var volumes = r.volumes || [];
+    _chapterHasMore = r.has_more || false;
+    if (volumes.length === 0) {
+      cl.innerHTML = '<div style="padding:8px;color:var(--text3);font-size:12px">暂无章节</div>';
+      return;
     }
-    cl.innerHTML = html || '<div style="padding:8px;color:var(--text3);font-size:12px">暂无章节</div>';
+    cl.innerHTML = buildChapterHtml(volumes);
+    // 设置懒加载哨兵
+    setupChapterObserver();
   });
+}
+function buildChapterHtml(volumes) {
+  var html = '';
+  for (var v = 0; v < volumes.length; v++) {
+    var vol = volumes[v];
+    html += '<div class="vol-header">' + escHtml(vol.name || vol.dir || '') + '</div>';
+    var chs = vol.chapters || [];
+    for (var c = 0; c < chs.length; c++) {
+      var ch = chs[c];
+      var chNum = ch.number || ch.num || (c + 1);
+      var volDir = vol.dir || 'vol_01';
+      html += '<div class="chapter-item" onclick="loadChapter(\'' + escHtml(volDir) + '\',' + chNum + ')">';
+      html += '<span class="ch-num">#' + chNum + '</span>';
+      html += '<span class="ch-title">' + escHtml(ch.title || '') + '</span>';
+      html += '<span class="ch-words">' + (ch.word_count || 0) + '字</span>';
+      html += '</div>';
+    }
+  }
+  return html;
+}
+function setupChapterObserver() {
+  if (_chapterObserver) _chapterObserver.disconnect();
+  var sentinel = document.getElementById('chapterSentinel');
+  if (!sentinel && _chapterHasMore) {
+    // 在章节列表底部插入哨兵
+    var cl = el('chapterList');
+    if (cl) {
+      var div = document.createElement('div');
+      div.id = 'chapterSentinel';
+      div.style.cssText = 'height:1px';
+      cl.appendChild(div);
+      sentinel = div;
+    }
+  }
+  if (!sentinel || !_chapterHasMore) return;
+  _chapterObserver = new IntersectionObserver(function(entries) {
+    if (entries[0].isIntersecting) {
+      _chapterObserver.disconnect();
+      _chapterPage++;
+      apiGet('/api/chapters?page=' + _chapterPage + '&size=50').then(function(r) {
+        if (!r) return;
+        var volumes = r.volumes || [];
+        _chapterHasMore = r.has_more || false;
+        if (volumes.length === 0) return;
+        // 追加到列表
+        var cl = el('chapterList');
+        if (cl) {
+          // 移除旧哨兵
+          var oldSentinel = document.getElementById('chapterSentinel');
+          if (oldSentinel) oldSentinel.remove();
+          // 追加新章节
+          var tmp = document.createElement('div');
+          tmp.innerHTML = buildChapterHtml(volumes);
+          while (tmp.firstChild) cl.appendChild(tmp.firstChild);
+          // 重新设置哨兵
+          if (_chapterHasMore) {
+            var div = document.createElement('div');
+            div.id = 'chapterSentinel';
+            div.style.cssText = 'height:1px';
+            cl.appendChild(div);
+          }
+        }
+        if (_chapterHasMore) setupChapterObserver();
+      });
+    }
+  }, {rootMargin: '200px'});
+  _chapterObserver.observe(sentinel);
 }
 
 // ── renderChapterList (from /api/status) ──

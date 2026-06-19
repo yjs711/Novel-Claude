@@ -1158,7 +1158,8 @@ async def get_outline():
 
 @app.post("/api/outline")
 async def save_outline(request: Request):
-    """Save structured outline + auto-generate markdown."""
+    """Save structured outline + auto-generate markdown. Skips write if unchanged."""
+    import hashlib
     data = await request.json()
     novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
     base = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
@@ -1166,7 +1167,14 @@ async def save_outline(request: Request):
     # Remove _source marker
     data.pop("_source", None)
     data.pop("markdown", None)
-    jp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    new_json = json.dumps(data, ensure_ascii=False, indent=2)
+    # 对比哈希，无变化则跳过写盘
+    if jp.exists():
+        old_hash = hashlib.sha256(jp.read_bytes()).hexdigest()
+        new_hash = hashlib.sha256(new_json.encode("utf-8")).hexdigest()
+        if old_hash == new_hash:
+            return {"ok": True, "unchanged": True}
+    jp.write_text(new_json, encoding="utf-8")
     # Auto-generate markdown
     md = _outline_to_markdown(data)
     mp.write_text(md, encoding="utf-8")
@@ -1525,15 +1533,17 @@ async def export_novel(fmt: str = "md"):
 # ── chapter directory (browse completed chapters) ───────────────────────
 
 @app.get("/api/chapters")
-async def list_chapter_files():
-    """List all written chapter files with metadata."""
+async def list_chapter_files(page: int = 0, size: int = 50):
+    """List all written chapter files with metadata. Supports pagination with ?page=N&size=M.
+    page=0 (default) returns all chapters (backward compat). page>=1 enables pagination."""
     novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
     base = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
     ms_dir = base / "manuscripts"
     if not ms_dir.exists():
-        return {"volumes": [], "total_chapters": 0, "total_words": 0}
+        return {"volumes": [], "total_chapters": 0, "total_words": 0, "page": page, "has_more": False}
 
-    volumes = []
+    # 收集全部章节
+    all_volumes = []
     total_words = 0
     for vol_dir in sorted(ms_dir.iterdir()):
         if not vol_dir.is_dir(): continue
@@ -1542,7 +1552,6 @@ async def list_chapter_files():
             content = ch_file.read_text(encoding="utf-8")
             num = int(ch_file.stem.split("_")[1])
             title = ""
-            # Extract title from first heading
             for line in content.split("\n"):
                 if line.startswith("# ") and "章" in line:
                     title = line.strip("# ").strip()
@@ -1555,15 +1564,43 @@ async def list_chapter_files():
                 "last_modified": ch_file.stat().st_mtime,
             })
         if chapters:
-            # Extract volume number from dir name
             vol_num = vol_dir.name.replace("vol_", "")
-            volumes.append({
+            all_volumes.append({
                 "name": f"第{int(vol_num)}卷" if vol_num.isdigit() else vol_dir.name,
                 "dir": vol_dir.name,
                 "chapters": chapters,
             })
 
-    return {"volumes": volumes, "total_chapters": sum(len(v.get("chapters",[])) for v in volumes), "total_words": total_words}
+    total_chapters = sum(len(v.get("chapters",[])) for v in all_volumes)
+
+    # 分页模式：按章节平铺截取
+    if page >= 1:
+        # 将所有章节平铺为 (volume_index, chapter_index) 列表
+        flat = []
+        for vi, vol in enumerate(all_volumes):
+            for ci, ch in enumerate(vol["chapters"]):
+                flat.append((vi, ci))
+        start = (page - 1) * size
+        end = start + size
+        page_items = flat[start:end]
+        # 重建 volumes 结构（只含本页章节）
+        paged_volumes = []
+        last_vi = -1
+        for vi, ci in page_items:
+            if vi != last_vi:
+                paged_volumes.append({
+                    "name": all_volumes[vi]["name"],
+                    "dir": all_volumes[vi]["dir"],
+                    "chapters": [],
+                })
+                last_vi = vi
+            paged_volumes[-1]["chapters"].append(all_volumes[vi]["chapters"][ci])
+        return {
+            "volumes": paged_volumes, "total_chapters": total_chapters,
+            "total_words": total_words, "page": page, "has_more": end < len(flat),
+        }
+
+    return {"volumes": all_volumes, "total_chapters": total_chapters, "total_words": total_words, "page": 0, "has_more": False}
 
 @app.get("/api/chapters/read")
 async def read_chapter_file(vol: str = "", num: int = 0):
