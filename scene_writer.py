@@ -334,11 +334,23 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
     # Will re-enable after web-verifying archetype definitions against published taxonomy.
     # See: core/narrative_diversity.py [待验证] markers.
 
-    # Storyform injection DISABLED — template problem/solution/concern assignments
-    # are not verified against official Dramatica storyforms.
-    # NCP v1.3.0 schema is valid, but our genre-specific mappings are unverified.
-    # Will re-enable after sourcing official Dramatica genre storyforms.
-    # See: core/storyform.py [待验证] markers.
+    # Inject storyform constraints (verified Dramatica examples: Hamlet + Star Wars)
+    try:
+        from core.storyform import Storyform
+        from utils.config_loader import get_config
+        novel_name = get_config("workspace.novel_name", default="")
+        sf_path = Path(".novel") / f"{novel_name}" / "storyform.json" if novel_name else None
+        if not sf_path or not sf_path.exists():
+            sf_path = Path(".novel") / "storyform.json"
+        if sf_path.exists():
+            import json
+            sf_data = json.loads(sf_path.read_text(encoding="utf-8"))
+            sf = Storyform.from_dict(sf_data)
+            sf_context = sf.to_writing_context()
+            if sf_context:
+                prompt += sf_context
+    except Exception as e:
+        logger.debug("Storyform injection skipped: %s", e)
 
     # Inject genre knowledge — slim: only this chapter's relevant hooks + mistakes
     try:
