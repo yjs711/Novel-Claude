@@ -1146,10 +1146,11 @@ function doRewrite() {
   currentAbort = ac;
   var rewritten = '';
 
+  var ch = parseInt(el('selChapter').value) || 1;
   fetch('/api/deai-rewrite', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({text: sel, prompt: prompt}),
+    body: JSON.stringify({content: sel, full_text: ta.value, chapter: ch, prompt: prompt}),
     signal: ac.signal
   }).then(function(resp) {
     var reader = resp.body.getReader();

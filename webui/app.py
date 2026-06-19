@@ -1635,6 +1635,7 @@ async def deai_rewrite(request: Request):
     chapter_num = data.get("chapter", 1)
     content = data.get("content", "")
     full_text = data.get("full_text", content)
+    user_prompt = data.get("prompt", "")
     if not full_text:
         return {"error": "content required"}
 
@@ -1691,7 +1692,16 @@ async def deai_rewrite(request: Request):
 4. 感官侵入：多写触觉/嗅觉/温度，少用视觉描述
 5. 对话必须有意推进，每轮承载事实/规矩/代价之一
 6. 情绪不直说，用动作和环境呈现
-7. 保持原文剧情走向，直接输出改写后的完整正文"""
+7. 保持原文剧情走向，直接输出改写后的完整正文
+{user_instruction}"""
+
+    # 用户自定义改写指令
+    user_instruction = ""
+    if user_prompt:
+        user_instruction = f"""
+
+**作者特别要求**：{user_prompt}
+请优先满足作者的改写要求，同时兼顾上述去AI味原则。"""
 
     async def generate():
         try:
@@ -1705,7 +1715,7 @@ async def deai_rewrite(request: Request):
                 stream=True,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"请重写以下章节，去除AI味：\n\n{full_text[-12000:]}"}
+                    {"role": "user", "content": f"全文上下文（供参考，不需要改写）：\n{full_text[-3000:]}\n\n---\n请改写以下选中文本（只输出改写后的选中部分，保持与上下文的连贯）：\n\n{content[:8000]}"}
                 ],
                 extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
