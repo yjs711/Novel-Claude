@@ -949,11 +949,13 @@ function renderChapterList(data) {
   var vols = Object.keys(volMap).sort(function(a,b) { return parseInt(a) - parseInt(b); });
   for (var vi = 0; vi < vols.length; vi++) {
     var vk = vols[vi];
-    html += '<div class="vol-header">第' + vk + '卷</div>';
+    var volLabel = vk === 'undefined' ? '1' : vk;
+    html += '<div class="vol-header">第' + volLabel + '卷</div>';
     var chs = volMap[vk];
     for (var ci = 0; ci < chs.length; ci++) {
       var ch = chs[ci];
-      html += '<div class="chapter-item" onclick="loadChapter(' + ch.volume + ',' + ch.num + ')">';
+      var chVol = ch.volume || 1;
+      html += '<div class="chapter-item" onclick="loadChapter(' + chVol + ',' + ch.num + ')">';
       html += '<span class="ch-num">#' + ch.num + '</span>';
       html += '<span class="ch-title">' + escHtml(ch.title || '') + '</span>';
       html += '<span class="ch-words">' + (ch.words || 0) + '字</span>';
@@ -981,16 +983,20 @@ function updateGateInfo(data) {
 
 // ── loadChapter ──
 function loadChapter(vol, ch) {
-  apiGet('/api/chapters/read?vol=vol_' + String(vol).padStart(2,'0') + '&num=' + ch).then(function(r) {
-    if (!r) return;
+  // 兼容两种格式：数字(1) 或 字符串('vol_01')
+  var volDir = (typeof vol === 'string' && vol.startsWith('vol_')) ? vol : 'vol_' + String(vol || 1).padStart(2, '0');
+  var volNum = parseInt((volDir.match(/\d+/) || ['1'])[0]) || 1;
+  apiGet('/api/chapters/read?vol=' + volDir + '&num=' + ch).then(function(r) {
+    if (!r) { showToast('章节文件不存在', true); return; }
+    if (r.error) { showToast(r.error, true); return; }
     var ta = el('editorTextarea');
     if (ta) {
       ta.value = r.content || '';
       onEditorInput();
     }
-    el('selVolume').value = vol;
+    el('selVolume').value = volNum;
     el('selChapter').value = ch;
-    showToast('已加载 第' + vol + '卷第' + ch + '章');
+    showToast('已加载 第' + volNum + '卷第' + ch + '章');
   });
 }
 

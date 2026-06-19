@@ -229,7 +229,8 @@ async def status():
         result["thread_count"] = len(s.plot_threads)
         result["chapter_count"] = len([c for c in s.chapters.values() if c.status != "planned"])
         result["chapters"] = [
-            {"num": num, "title": ch.title, "status": ch.status, "words": ch.word_count}
+            {"num": num, "volume": (num - 1) // 70 + 1,
+             "title": ch.title, "status": ch.status, "words": ch.word_count}
             for num, ch in sorted(s.chapters.items())[-20:]
         ]
 
