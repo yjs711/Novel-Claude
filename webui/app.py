@@ -1677,6 +1677,14 @@ async def deai_rewrite(request: Request):
     client = get_task_client("writing")
     model = get_task_model("writing")
 
+    # 用户自定义改写指令
+    user_instruction = ""
+    if user_prompt:
+        user_instruction = f"""
+
+**作者特别要求**：{user_prompt}
+请优先满足作者的改写要求，同时兼顾上述去AI味原则。"""
+
     from utils.prompt_loader import polishing_prompt
     system_prompt = polishing_prompt() + f"""
 
@@ -1694,14 +1702,6 @@ async def deai_rewrite(request: Request):
 6. 情绪不直说，用动作和环境呈现
 7. 保持原文剧情走向，直接输出改写后的完整正文
 {user_instruction}"""
-
-    # 用户自定义改写指令
-    user_instruction = ""
-    if user_prompt:
-        user_instruction = f"""
-
-**作者特别要求**：{user_prompt}
-请优先满足作者的改写要求，同时兼顾上述去AI味原则。"""
 
     async def generate():
         try:

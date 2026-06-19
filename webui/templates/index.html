@@ -785,7 +785,6 @@ function loadStatus() {
   apiGet('/api/status').then(function(r) {
     if (!r) return;
     statusData = r;
-    renderChapterList(r);
     updateGateInfo(r);
     logMsg(r.connected ? '在线' : '离线');
     // 版本号
