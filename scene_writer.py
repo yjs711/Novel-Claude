@@ -373,6 +373,20 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
     except Exception:
         pass  # Non-critical
 
+    # Inject genre knowledge (题材脑洞知识库 — structured writing craft)
+    try:
+        from core.genre_knowledge import get_genre_knowledge, get_commercial_methods
+        from utils.config_loader import get_config
+        genre_name = get_config("genre", default="")
+        if genre_name:
+            gk = get_genre_knowledge(genre_name)
+            if gk:
+                prompt += gk.to_writing_context()
+                prompt += get_commercial_methods()
+                print(f"  [OK] Genre knowledge: {gk.name}")
+    except Exception:
+        pass  # Non-critical
+
     # Emit hook for skill injection
     beat_data = {"chapter_id": chapter_id, "title": chapter_title, "overview": overview}
     prompt_parts = [prompt]
