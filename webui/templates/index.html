@@ -1768,7 +1768,7 @@ function loadModels() {
     var keys = Object.keys(r.models);
     for (var i = 0; i < keys.length; i++) {
       var m = r.models[keys[i]];
-      if (m.purpose === 'writing') {
+      if (keys[i] !== 'default') {
         var opt = document.createElement('option');
         opt.value = keys[i];
         opt.textContent = m.label || keys[i];
