@@ -303,6 +303,7 @@ textarea { resize: vertical; }
     <span class="sep"></span>
     <button class="btn-primary btn-sm" onclick="doGenerate()">生成</button>
     <button class="btn-secondary btn-sm" onclick="doPause()" id="btnPause" style="display:none">暂停</button>
+    <button class="btn-secondary btn-sm" onclick="doGenerate()" id="btnRetry" style="display:none">重试</button>
     <button class="btn-secondary btn-sm" onclick="doRewrite()">AI改写</button>
     <button class="btn-secondary btn-sm" onclick="toggleWizard()">故事蓝图</button>
     <button class="btn-secondary btn-sm" onclick="doSaveSnapshot()">保存快照</button>
@@ -922,6 +923,7 @@ function loadChapter(vol, ch) {
 }
 
 // ── doGenerate ──
+var _genWatchdog = null;
 function doGenerate() {
   var vol = parseInt(el('selVolume').value) || 1;
   var ch = parseInt(el('selChapter').value) || 1;
@@ -933,15 +935,27 @@ function doGenerate() {
     currentAbort.abort();
     currentAbort = null;
   }
+  // 清除旧看门狗
+  if (_genWatchdog) { clearInterval(_genWatchdog); _genWatchdog = null; }
 
   // Show pause button
   el('btnPause').style.display = '';
+  el('btnRetry').style.display = 'none';
 
   var ac = new AbortController();
   currentAbort = ac;
   ta.value = '';
   logMsg('生成中 V' + vol + 'C' + ch + '...');
   var fullText = '';
+  var lastDataTime = Date.now();
+
+  // 看门狗：45s 无数据则警告
+  _genWatchdog = setInterval(function() {
+    var silent = Date.now() - lastDataTime;
+    if (silent > 45000) {
+      logMsg('⚠ 等待响应中...（' + Math.round(silent/1000) + 's）');
+    }
+  }, 10000);
 
   fetch('/api/write-stream?mode=' + mode, {
     method: 'POST',
@@ -949,6 +963,7 @@ function doGenerate() {
     body: JSON.stringify({volume: vol, chapter: ch}),
     signal: ac.signal
   }).then(function(resp) {
+    if (!resp.ok) { throw new Error('HTTP ' + resp.status); }
     var reader = resp.body.getReader();
     var decoder = new TextDecoder();
     var buffer = '';
@@ -956,10 +971,7 @@ function doGenerate() {
     function readChunk() {
       reader.read().then(function(result) {
         if (result.done) {
-          el('btnPause').style.display = 'none';
-          currentAbort = null;
-          logMsg('生成完成');
-          showToast('生成完成: ' + fullText.length + '字');
+          finishGen();
           return;
         }
         buffer += decoder.decode(result.value, {stream: true});
@@ -967,7 +979,10 @@ function doGenerate() {
         buffer = lines.pop() || '';
         for (var i = 0; i < lines.length; i++) {
           var line = lines[i];
+          // 跳过心跳注释
+          if (!line || line.startsWith(': ')) continue;
           if (!line.startsWith('data: ')) continue;
+          lastDataTime = Date.now();
           try {
             var d = JSON.parse(line.slice(6));
             if (d.type === 'stream' || d.type === 'token') {
@@ -992,25 +1007,37 @@ function doGenerate() {
             } else if (d.type === 'status') {
               logMsg(d.msg);
             } else if (d.type === 'agent_result') {
-              fullText = ta.value; // keep what we have
+              fullText = ta.value;
             }
           } catch(e) {}
         }
         readChunk();
       }).catch(function(e) {
-        if (e.name === 'AbortError') return;
-        showToast('读取失败: ' + e.message, true);
-        el('btnPause').style.display = 'none';
-        currentAbort = null;
+        if (e.name === 'AbortError') { finishGen(); return; }
+        showToast('流读取失败: ' + e.message, true);
+        logMsg('流中断: ' + e.message);
+        showRetry();
       });
     }
     readChunk();
   }).catch(function(e) {
-    if (e.name === 'AbortError') return;
-    showToast('生成失败: ' + e.message, true);
-    el('btnPause').style.display = 'none';
-    currentAbort = null;
+    if (e.name === 'AbortError') { finishGen(); return; }
+    showToast('生成请求失败: ' + e.message, true);
+    logMsg('请求失败: ' + e.message);
+    showRetry();
   });
+}
+
+function finishGen() {
+  if (_genWatchdog) { clearInterval(_genWatchdog); _genWatchdog = null; }
+  el('btnPause').style.display = 'none';
+  currentAbort = null;
+}
+
+function showRetry() {
+  finishGen();
+  el('btnRetry').style.display = '';
+  logMsg('点击重试按钮重新生成');
 }
 
 // ── doPause ──
@@ -1019,7 +1046,7 @@ function doPause() {
     currentAbort.abort();
     currentAbort = null;
   }
-  el('btnPause').style.display = 'none';
+  finishGen();
   logMsg('已暂停');
   showToast('已暂停生成');
 }

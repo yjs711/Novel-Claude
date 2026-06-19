@@ -532,9 +532,10 @@ async def write_stream(request: Request):
                     try:
                         kind, value = await asyncio.wait_for(token_queue.get(), timeout=min(remaining, 30))
                     except asyncio.TimeoutError:
-                        # 30秒没新 token，检查是否完成
+                        # 30秒没新 token，检查是否完成，发心跳保活
                         if future.done():
                             break
+                        yield ": heartbeat\n\n"
                         continue
                     if kind == "token":
                         full_content += value
