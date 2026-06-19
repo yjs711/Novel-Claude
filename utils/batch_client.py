@@ -1,12 +1,18 @@
 import json
 import time
 import os
-from zhipuai import ZhipuAI
 
-# Use Zhipu API key — check env first, fallback to config
+# ZhipuAI batch client — requires: pip install zhipuai
+# This module is optional; only used when batch processing is explicitly invoked.
+try:
+    from zhipuai import ZhipuAI
+    _zhipuai_available = True
+except ImportError:
+    ZhipuAI = None
+    _zhipuai_available = False
+
 _api_key = os.getenv("ZHIPU_API_KEY", "")
-
-client = ZhipuAI(api_key=_api_key)
+client = ZhipuAI(api_key=_api_key) if _zhipuai_available else None
 
 def submit_batch_task(jsonl_file_path: str, endpoint: str = "/v4/chat/completions", desc: str = "") -> str:
     """上传文件并创建 Batch 任务，返回 batch_id"""
