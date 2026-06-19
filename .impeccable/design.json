@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-20T18:00:00+08:00",
+  "title": "Design System: Novel-Claude — The Holographic Terminal",
+  "extensions": {
+    "colorMeta": {
+      "void-deep":        { "role": "neutral",  "displayName": "Void Deep",    "canonical": "oklch(8% 0.01 260)",  "tonalRamp": ["oklch(8% 0.01 260)",  "oklch(12% 0.01 260)", "oklch(16% 0.012 260)", "oklch(20% 0.012 260)", "oklch(28% 0.015 260)", "oklch(36% 0.015 260)", "oklch(48% 0.012 260)", "oklch(60% 0.008 260)"] },
+      "void-surface":     { "role": "neutral",  "displayName": "Void Surface", "canonical": "oklch(12% 0.01 260)",  "tonalRamp": [] },
+      "void-elevated":    { "role": "neutral",  "displayName": "Void Elevated","canonical": "oklch(16% 0.012 260)", "tonalRamp": [] },
+      "void-border":      { "role": "neutral",  "displayName": "Void Border",  "canonical": "oklch(22% 0.02 255)",  "tonalRamp": [] },
+      "ink-primary":      { "role": "neutral",  "displayName": "Ink Primary",  "canonical": "oklch(94% 0.005 240)", "tonalRamp": [] },
+      "ink-secondary":    { "role": "neutral",  "displayName": "Ink Secondary","canonical": "oklch(62% 0.02 250)",  "tonalRamp": [] },
+      "ink-tertiary":     { "role": "neutral",  "displayName": "Ink Tertiary", "canonical": "oklch(40% 0.03 250)",  "tonalRamp": [] },
+      "neon-cyan":        { "role": "primary",  "displayName": "Neon Cyan",    "canonical": "oklch(78% 0.18 230)",  "tonalRamp": ["oklch(35% 0.12 230)", "oklch(50% 0.15 230)", "oklch(65% 0.17 230)", "oklch(78% 0.18 230)", "oklch(84% 0.12 230)", "oklch(90% 0.06 230)", "oklch(94% 0.03 230)", "oklch(97% 0.01 230)"] },
+      "neon-cyan-glow":   { "role": "primary",  "displayName": "Neon Cyan Glow","canonical": "oklch(78% 0.18 230 / 0.4)", "tonalRamp": [] },
+      "neon-violet":      { "role": "secondary","displayName": "Neon Violet",  "canonical": "oklch(65% 0.22 300)",  "tonalRamp": [] },
+      "neon-violet-glow": { "role": "secondary","displayName": "Neon Violet Glow","canonical": "oklch(65% 0.22 300 / 0.4)", "tonalRamp": [] },
+      "neon-mint":        { "role": "tertiary", "displayName": "Neon Mint",    "canonical": "oklch(78% 0.18 170)",  "tonalRamp": [] },
+      "neon-amber":       { "role": "tertiary", "displayName": "Neon Amber",   "canonical": "oklch(78% 0.15 85)",   "tonalRamp": [] },
+      "neon-rose":        { "role": "tertiary", "displayName": "Neon Rose",    "canonical": "oklch(62% 0.23 15)",   "tonalRamp": [] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "向导标题、故事蓝图主标题，仅模态和向导中使用" },
+      "headline": { "displayName": "Headline", "purpose": "面板标题、章节标题" },
+      "title":    { "displayName": "Title",    "purpose": "卡片标题、模块标题、对话框角色名" },
+      "body":     { "displayName": "Body",     "purpose": "正文、编辑器内容、对话，最大行宽75ch" },
+      "label":    { "displayName": "Label",    "purpose": "按钮、徽章、面板标题全大写、数据标注" },
+      "mono":     { "displayName": "Mono",     "purpose": "代码、字数统计、门控分数、JSON预览" }
+    },
+    "shadows": [
+      { "name": "focus-ring",  "value": "0 0 0 2px #080a10, 0 0 0 3px #00c8ff", "purpose": "全局焦点指示器双环" },
+      { "name": "modal-glow",  "value": "0 0 0 1px #00c8ff22", "purpose": "模态/弹出层微霓虹外发光" },
+      { "name": "input-focus", "value": "0 0 0 2px #00c8ff33", "purpose": "输入框聚焦霓虹青发光" }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "默认状态过渡（hover/focus/active）" },
+      { "name": "ease-in",       "value": "cubic-bezier(0.4, 0, 1, 1)",   "purpose": "元素入场" },
+      { "name": "ease-out",      "value": "cubic-bezier(0, 0, 0.2, 1)",   "purpose": "元素退场" },
+      { "name": "duration-fast",    "value": "120ms", "purpose": "微交互（hover/focus）" },
+      { "name": "duration-standard","value": "200ms", "purpose": "状态切换、面板折叠" },
+      { "name": "duration-slow",    "value": "300ms", "purpose": "主题切换、模态开闭" }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "主操作按钮。霓虹青底+深色文字，全息终端最主要的交互信号。用于生成、保存、确认等正向操作。",
+      "html": "<button class=\"ds-btn-primary\">GENERATE</button>",
+      "css": ".ds-btn-primary { background: #00c8ff; color: #080a10; padding: 8px 20px; border: none; border-radius: 2px; font-family: 'Inter', system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: background 120ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: #00c8ffaa; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #080a10, 0 0 0 3px #00c8ff; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "次要操作按钮。虚空抬升底+冷白文字+1px冷色边框。用于改写、暂停、折叠等辅助操作。",
+      "html": "<button class=\"ds-btn-secondary\">REWRITE</button>",
+      "css": ".ds-btn-secondary { background: #141a24; color: #8090b0; padding: 8px 16px; border: 1px solid #1c2541; border-radius: 2px; font-family: 'Inter', system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 120ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-secondary:hover { color: #e8edf5; border-color: #4a5578; } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px #080a10, 0 0 0 3px #00c8ff; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "文本输入框。虚空面板底+冷色边框，focus时霓虹青发光。用于卷号、章号、搜索等。",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search chapters...\">",
+      "css": ".ds-input { background: #0d1117; color: #e8edf5; padding: 6px 12px; border: 1px solid #1c2541; border-radius: 2px; font-family: 'Inter', system-ui, sans-serif; font-size: 0.8125rem; outline: none; transition: border-color 120ms, box-shadow 120ms; } .ds-input::placeholder { color: #4a5578; } .ds-input:focus { border-color: #00c8ff; box-shadow: 0 0 0 2px #00c8ff33; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "标准面板。虚空表面底+1px冷色边框+4px利落圆角。四面板布局的核心容器。",
+      "html": "<div class=\"ds-panel\"><div class=\"ds-panel-header\">PANEL TITLE</div><div class=\"ds-panel-body\">Content</div></div>",
+      "css": ".ds-panel { background: #0d1117; border: 1px solid #1c2541; border-radius: 4px; display: flex; flex-direction: column; } .ds-panel-header { padding: 10px 14px; border-bottom: 1px solid #1c2541; font-family: 'Inter', system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; color: #8090b0; letter-spacing: 0.06em; text-transform: uppercase; } .ds-panel-body { flex: 1; padding: 16px; overflow-y: auto; }"
+    },
+    {
+      "name": "Status Badge (Pass)",
+      "kind": "chip",
+      "refersTo": "badge-ok",
+      "description": "通过状态徽章。霓虹薄荷边框+文字，胶囊形。用于门控通过、伏笔已回收。",
+      "html": "<span class=\"ds-badge ds-badge-ok\">PASS</span>",
+      "css": ".ds-badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; } .ds-badge-ok { background: transparent; color: #00e5a0; border: 1px solid #00e5a0; }"
+    },
+    {
+      "name": "Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "标签栏导航。底部分割线+霓虹青下划线指示active。细纲|伏笔双Tab。",
+      "html": "<nav class=\"ds-tab-bar\"><button class=\"ds-tab active\">OUTLINE</button><button class=\"ds-tab\">FORESHADOWS</button></nav>",
+      "css": ".ds-tab-bar { display: flex; border-bottom: 1px solid #1c2541; } .ds-tab { flex: 1; padding: 6px 0; border: none; border-bottom: 2px solid transparent; background: transparent; color: #8090b0; font-family: 'Inter', system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 120ms; } .ds-tab.active { color: #00c8ff; border-bottom-color: #00c8ff; } .ds-tab:hover:not(.active) { color: #e8edf5; }"
+    },
+    {
+      "name": "Focus Ring (Global)",
+      "kind": "custom",
+      "refersTo": "focus-ring",
+      "description": "全局焦点指示器。双环结构确保在暗底和亮元素上都可见。",
+      "html": "<span style=\"padding:4px 12px;box-shadow:0 0 0 2px #080a10,0 0 0 3px #00c8ff;border-radius:2px;color:#e8edf5;font-family:Inter,system-ui,sans-serif;font-size:0.875rem\">FOCUSED ELEMENT</span>",
+      "css": "/* Applied globally via :focus-visible */\n*:focus-visible { outline: none; box-shadow: 0 0 0 2px #080a10, 0 0 0 3px #00c8ff; border-radius: 1px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Holographic Terminal",
+    "overview": "Novel-Claude 的界面是一个悬浮在虚空中全息投影创作终端。暗色基底几乎消失，霓虹元素像全息光纹一样漂浮在表面之上。它不是\"深色模式\"——它是\"虚空模式\"：界面退到背景中，文字和操作元素像被投射到空间中一样浮现。这个系统明确拒绝 Google Material Design 的圆角大卡片、Bento 网格、蓝白配色，拒绝苹果极简白的眩光，拒绝传统网文写作软件的界面堆砌。",
+    "keyCharacteristics": [
+      "虚空基底：极深蓝黑（#080a10）作为背景，几乎感知不到界面的存在",
+      "霓虹功能指示：青=主要操作，紫=强调/选中，绿=成功/通过，琥珀=警告，玫红=危险",
+      "全息层次：面板通过微妙边框光晕和表面抬升区分，而非厚重阴影",
+      "全无衬线：抛弃文学衬线体，拥抱科技感几何无衬线",
+      "玻璃质面板：半透明深色面板带 1px 冷色边框，悬浮感而非卡片感"
+    ],
+    "rules": [
+      { "name": "The One-Neon Rule", "body": "任何给定屏幕上，霓虹色总面积 ≤10%。霓虹青作为主操作色占比最高，紫色次之，其他霓虹色仅出现在状态指示中。稀有即力量。", "section": "colors" },
+      { "name": "The No-Gray Rule", "body": "不使用中性灰（#808080 系）。所有\"灰色\"必须是蓝调的虚空色（void-*），与霓虹色产生冷暖对比。", "section": "colors" },
+      { "name": "The Glow Reserve Rule", "body": "发光态（*-glow）仅用于 hover/focus/active 交互反馈。静态元素不使用 box-shadow glow。界面在静止时保持冷静，交互时才展现霓虹生命力。", "section": "colors" },
+      { "name": "The No-Shadow Rule", "body": "不使用 box-shadow 表达深度。面板间通过 1px 冷色边框 + 亮度差异区分。唯一的例外：模态层的霓虹青外发光。", "section": "elevation" },
+      { "name": "The Line-Length Rule", "body": "正文最大行宽 75ch。编辑器内部最大 820px 已在此范围内。", "section": "typography" }
+    ],
+    "dos": [
+      "用 void-border（#1c2541）做所有分割线和边框",
+      "只用霓虹青做主要操作色——其他霓虹色仅用于状态指示",
+      "保持面板 1px 边框——暗色基底上无边框等于消失",
+      "所有交互元素有 :focus-visible 双环",
+      "动效尊重 prefers-reduced-motion",
+      "正文行宽 ≤75ch，编辑器最大 820px"
+    ],
+    "donts": [
+      "使用 Google Material Design 3 的任何特征",
+      "使用纯黑（#000000）或纯白（#FFFFFF）",
+      "使用中性灰（#808080、#999999 系）",
+      "使用 box-shadow 表达深度",
+      "在面板内嵌套面板",
+      "同时使用超过 2 种霓虹色（青+紫是上限）",
+      "在静态元素上使用发光态",
+      "使用 serif 衬线字体",
+      "圆角超过 8px"
+    ]
+  }
+}
