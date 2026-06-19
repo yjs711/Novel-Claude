@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-VERSION = "v0.1"
+VERSION = "v0.2"
 
 app = FastAPI(title=f"Novel-Claude Fusion {VERSION}")
 
