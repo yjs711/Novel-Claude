@@ -6,396 +6,405 @@
 <title>Novel-Claude · 写作工作室</title>
 <style>
   :root {
-    --bg: #f8f9fa;
-    --surface: #ffffff;
-    --surface2: #f1f3f5;
-    --border: #e9ecef;
-    --text: #212529;
-    --text2: #868e96;
-    --text3: #adb5bd;
-    --primary: #4263eb;
-    --primary-hover: #3b5bdb;
-    --primary-light: #edf2ff;
-    --success: #2b8a3e;
-    --warning: #e67700;
-    --danger: #c92a2a;
+    --bg: #f8f9fa; --surface: #ffffff; --surface2: #f1f3f5; --border: #e9ecef;
+    --text: #212529; --text2: #868e96; --text3: #adb5bd;
+    --primary: #4263eb; --primary-hover: #3b5bdb; --primary-light: #edf2ff;
+    --success: #2b8a3e; --success-light: #ebfbee;
+    --warning: #e67700; --warning-light: #fff9db;
+    --danger: #c92a2a; --danger-light: #fff5f5;
     --accent: #be4bdb;
-    --radius: 8px;
-    --radius-sm: 6px;
+    --radius: 8px; --radius-sm: 6px;
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
     --shadow: 0 1px 3px rgba(0,0,0,0.06);
-    --sidebar: 220px;
-    --editor-max: 720px;
-    --font-sans: -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-    --font-serif: "Noto Serif SC","Source Han Serif SC",Georgia,serif;
+    --sidebar: 200px; --right-panel: 300px;
+    --font-sans: -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    --font-serif: "Noto Serif SC",Georgia,serif;
     --font-mono: "JetBrains Mono","Fira Code",monospace;
   }
   * { box-sizing:border-box;margin:0;padding:0 }
-  body { font-family:var(--font-sans);background:var(--bg);color:var(--text);line-height:1.6;height:100vh;display:flex;overflow:hidden }
-  a { color:var(--primary);text-decoration:none }
-  button { cursor:pointer;font-family:inherit;border:none;border-radius:var(--radius-sm);padding:6px 14px;font-size:13px;transition:background 0.15s,color 0.15s }
-  .btn-primary { background:var(--primary);color:#fff }
-  .btn-primary:hover { background:var(--primary-hover) }
-  .btn-secondary { background:var(--surface2);color:var(--text) }
-  .btn-secondary:hover { background:var(--border) }
-  .btn-danger { background:var(--danger);color:#fff }
-  .btn-sm { padding:4px 10px;font-size:12px }
-  input,select,textarea { font-family:inherit;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:13px;color:var(--text);outline:none;transition:border-color 0.15s }
+  body { font-family:var(--font-sans);background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden }
+  button { cursor:pointer;font-family:inherit;border:none;border-radius:var(--radius-sm);padding:6px 14px;font-size:13px;transition:.15s }
+  .btn-primary { background:var(--primary);color:#fff } .btn-primary:hover { background:var(--primary-hover) }
+  .btn-secondary { background:var(--surface2);color:var(--text) } .btn-secondary:hover { background:var(--border) }
+  .btn-danger { background:var(--danger);color:#fff } .btn-sm { padding:4px 10px;font-size:12px }
+  .btn-block { width:100%;margin-bottom:4px }
+  input,select,textarea { font-family:inherit;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:13px;outline:none }
   input:focus,select:focus,textarea:focus { border-color:var(--primary) }
   .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600 }
-  .badge-ok { background:var(--success-light);color:var(--success) }
-  .badge-warn { background:var(--warning-light);color:var(--warning) }
-  .badge-err { background:#fff5f5;color:var(--danger) }
-  ::-webkit-scrollbar { width:5px }
-  ::-webkit-scrollbar-thumb { background:var(--text3);border-radius:3px }
-
-  /* Layout: three-column */
+  .bg-ok { background:var(--success-light);color:var(--success) }
+  .bg-warn { background:var(--warning-light);color:var(--warning) }
+  .bg-err { background:var(--danger-light);color:var(--danger) }
+  ::-webkit-scrollbar { width:5px } ::-webkit-scrollbar-thumb { background:var(--text3);border-radius:3px }
   .layout { display:flex;width:100%;height:100% }
-
-  /* Left sidebar */
   .sidebar { width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0 }
-  .sidebar-header { padding:16px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px }
-  .sidebar-header .dot { width:8px;height:8px;border-radius:50%;background:var(--success) }
-  .sidebar-nav { flex:1;overflow-y:auto;padding:8px }
-  .sidebar-nav button { display:block;width:100%;text-align:left;padding:8px 12px;margin-bottom:2px;background:transparent;border-radius:var(--radius-sm);font-size:13px;color:var(--text2) }
+  .sidebar-header { padding:14px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px }
+  .sidebar-header .dot { width:7px;height:7px;border-radius:50%;background:var(--success) }
+  .sidebar-nav { flex:1;overflow-y:auto;padding:6px }
+  .sidebar-nav button { display:block;width:100%;text-align:left;padding:7px 12px;margin-bottom:1px;background:transparent;border-radius:var(--radius-sm);font-size:12px;color:var(--text2) }
   .sidebar-nav button:hover,.sidebar-nav button.active { background:var(--primary-light);color:var(--primary) }
-  .sidebar-footer { padding:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text3) }
-
-  /* Main area */
+  .sidebar-footer { padding:10px 12px;border-top:1px solid var(--border);font-size:10px;color:var(--text3) }
   .main { flex:1;display:flex;flex-direction:column;overflow:hidden }
-  .toolbar { padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0 }
-  .toolbar .sep { width:1px;height:20px;background:var(--border);margin:0 4px }
-  .toolbar .status { margin-left:auto;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:8px }
+  .toolbar { padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:12px }
+  .toolbar select { width:70px } .toolbar input[type=number] { width:55px }
+  .toolbar .sep { width:1px;height:18px;background:var(--border);margin:0 2px }
   .content { flex:1;display:flex;overflow:hidden }
-
-  /* Editor panel */
-  .editor-panel { flex:1;overflow-y:auto;padding:24px 32px;display:flex;justify-content:center }
-  .editor-inner { max-width:var(--editor-max);width:100% }
-  .editor-inner h2 { font-size:20px;margin-bottom:16px }
-  .editor-inner textarea { width:100%;min-height:400px;font-family:var(--font-serif);font-size:16px;line-height:1.8;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);resize:vertical }
-  .editor-inner textarea:focus { border-color:var(--primary) }
-  .editor-inner .output { font-family:var(--font-serif);font-size:16px;line-height:1.8;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);white-space:pre-wrap;min-height:400px }
-
-  /* Right panel */
-  .right-panel { width:280px;background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column }
-  .right-panel section { padding:16px;border-bottom:1px solid var(--border) }
-  .right-panel h4 { font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:8px }
-  .right-panel .card { background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;font-size:13px }
-  .right-panel .metric { display:flex;justify-content:space-between;align-items:center;padding:4px 0 }
-  .right-panel .metric-val { font-weight:700;font-size:18px }
-  .right-panel .log-line { font-size:11px;color:var(--text2);padding:2px 0;border-bottom:1px solid var(--surface2);font-family:var(--font-mono) }
-
-  /* Dashboard grid */
-  .dashboard { display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:24px }
-  .dash-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px }
-  .dash-card h3 { font-size:13px;color:var(--text2);margin-bottom:4px }
-  .dash-card .big { font-size:28px;font-weight:700 }
-  .dash-card.large { grid-column:span 2 }
-
-  /* Toasts */
-  .toast { position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;z-index:999;animation:slideUp 0.3s ease }
+  .panel { flex:1;overflow-y:auto;padding:20px 28px }
+  .panel-write { display:flex;justify-content:center }
+  .panel-write .inner { max-width:700px;width:100% }
+  .panel-write .output { font-family:var(--font-serif);font-size:16px;line-height:1.8;padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);white-space:pre-wrap;min-height:400px }
+  .panel-write .status-bar { display:flex;gap:8px;margin-top:10px;font-size:12px;color:var(--text2) }
+  .panel-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px 24px }
+  .card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px }
+  .card h4 { font-size:11px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px }
+  .card .val { font-size:24px;font-weight:700 }
+  .card.wide { grid-column:span 2 }
+  .card table { width:100%;font-size:12px;border-collapse:collapse }
+  .card table td,.card table th { padding:4px 6px;border-bottom:1px solid var(--surface2);text-align:left }
+  .card table th { color:var(--text2);font-weight:500 }
+  .right-panel { width:var(--right-panel);background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;font-size:12px }
+  .right-panel section { padding:12px;border-bottom:1px solid var(--border) }
+  .right-panel h4 { font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px }
+  .rp-row { display:flex;justify-content:space-between;padding:3px 0 }
+  .rp-log { max-height:180px;overflow-y:auto;font-family:var(--font-mono);font-size:10px;color:var(--text2) }
+  .rp-log div { padding:2px 0;border-bottom:1px solid var(--surface2) }
+  .tab-hidden { display:none }
+  .toast { position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;z-index:999;animation:slideUp .3s }
   @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
   .toast-ok { background:var(--success-light);color:var(--success) }
-  .toast-err { background:#fff5f5;color:var(--danger) }
 </style>
 </head>
 <body>
 <div class="layout">
-  <!-- Left Sidebar -->
-  <nav class="sidebar">
-    <div class="sidebar-header"><span class="dot"></span>Novel-Claude</div>
-    <div class="sidebar-nav" id="sidebarNav">
-      <button class="active" data-tab="write">✍️ 写作</button>
-      <button data-tab="outline">📋 大纲</button>
-      <button data-tab="dashboard">📊 面板</button>
-      <button data-tab="files">📁 文件</button>
-      <button data-tab="settings">⚙️ 设置</button>
-    </div>
-    <div class="sidebar-footer" id="sidebarStatus">加载中…</div>
-  </nav>
-
-  <!-- Main Area -->
-  <div class="main">
-    <div class="toolbar">
-      <select id="genreSelect" style="width:80px"><option>修仙</option><option>玄幻</option><option>都市</option></select>
-      <select id="volumeSelect" style="width:60px"><option>1</option></select>
-      <input id="chapterInput" type="number" value="1" min="1" style="width:60px">
-      <button class="btn-primary" onclick="startWrite()">生成章节</button>
-      <span class="sep"></span>
-      <button class="btn-secondary btn-sm" onclick="loadStatus()">刷新</button>
-      <div class="status">
-        <span id="modelStatus">模型: --</span>
-        <span id="wordCount">字数: 0</span>
-      </div>
-    </div>
-
-    <div class="content" id="mainContent">
-      <!-- Write Tab -->
-      <div class="editor-panel" id="tab-write">
-        <div class="editor-inner">
-          <h2 id="chapterTitle">章节标题</h2>
-          <div id="editorOutput" class="output">点击"生成章节"开始创作…</div>
-          <div style="margin-top:12px;display:flex;gap:8px">
-            <button class="btn-primary btn-sm" onclick="startWrite()">生成</button>
-            <button class="btn-secondary btn-sm" onclick="analyzeChapter()">分析</button>
-            <button class="btn-secondary btn-sm" onclick="exportChapter()">导出</button>
-          </div>
-        </div>
-      </div>
-      <!-- Outline Tab -->
-      <div class="editor-panel" id="tab-outline" style="display:none">
-        <div class="editor-inner">
-          <h2>大纲管理</h2>
-          <textarea id="outlineText" placeholder="在此编辑大纲…" style="min-height:300px"></textarea>
-          <div style="margin-top:8px;display:flex;gap:8px">
-            <button class="btn-primary btn-sm" onclick="saveOutline()">保存</button>
-            <button class="btn-secondary btn-sm" onclick="loadOutline()">加载</button>
-          </div>
-        </div>
-      </div>
-      <!-- Dashboard Tab -->
-      <div class="dashboard" id="tab-dashboard" style="display:none">
-        <div class="dash-card"><h3>总字数</h3><div class="big" id="dashTotalWords">0</div></div>
-        <div class="dash-card"><h3>已完成章</h3><div class="big" id="dashChapters">0</div></div>
-        <div class="dash-card"><h3>角色数</h3><div class="big" id="dashChars">0</div></div>
-        <div class="dash-card"><h3>剧情线</h3><div class="big" id="dashThreads">0</div></div>
-        <div class="dash-card large"><h3>最近质量门控</h3><div id="dashGate">--</div></div>
-        <div class="dash-card large"><h3>叙事多样性</h3><div id="dashDiversity">--</div></div>
-      </div>
-      <!-- Files Tab -->
-      <div class="editor-panel" id="tab-files" style="display:none">
-        <div class="editor-inner"><h2>项目管理</h2><div id="fileList">加载中…</div></div>
-      </div>
-      <!-- Settings Tab -->
-      <div class="editor-panel" id="tab-settings" style="display:none">
-        <div class="editor-inner">
-          <h2>设置</h2>
-          <div class="card" style="margin-bottom:12px">
-            <label>体裁 <select id="cfgGenre"></select></label>
-            <label style="margin-left:12px">风格 <select id="cfgStyle"></select></label>
-            <label style="margin-left:12px">模式 <select id="cfgMode"><option>quick</option><option>standard</option><option>deep</option></select></label>
-            <button class="btn-primary btn-sm" style="margin-left:12px" onclick="saveSettings()">保存</button>
-          </div>
-          <div class="card">
-            <h4>故事结构 (NCP)</h4>
-            <select id="cfgStoryform"><option value="">无</option><option disabled>— 西方经典 —</option><option value="revenge">复仇悲剧 (哈姆雷特)</option><option value="rise_to_power">英雄之旅 (星球大战)</option><option disabled>— 中国网文 —</option><option value="fanren">凡人流逆袭 (凡人修仙传)</option><option value="doupo">废材复仇成帝 (斗破苍穹)</option><option value="guimi">克苏鲁扮演法 (诡秘之主)</option><option value="dageng">案件驱动 (大奉打更人)</option><option value="xuezhong">珠帘群像江湖 (雪中悍刀行)</option><option value="fuhan">英雄气争霸 (覆汉)</option><option value="urban">都市逆袭 (都市爽文)</option></select>
-            <button class="btn-primary btn-sm" onclick="saveStoryform()">应用</button>
-          </div>
-        </div>
-      </div>
-    </div>
+<nav class="sidebar">
+  <div class="sidebar-header"><span class="dot" id="sidebarDot"></span><span id="sidebarTitle">Novel-Claude</span></div>
+  <div class="sidebar-nav">
+    <button class="active" data-tab="write">✍️ 写作</button>
+    <button data-tab="dashboard">📊 总览</button>
+    <button data-tab="outline">📋 大纲</button>
+    <button data-tab="characters">👤 角色</button>
+    <button data-tab="world">🌍 世界</button>
+    <button data-tab="audit">🔍 审阅</button>
+    <button data-tab="memory">🧠 记忆</button>
+    <button data-tab="logs">📜 日志</button>
+    <button data-tab="settings">⚙️ 设置</button>
   </div>
+  <div class="sidebar-footer" id="sidebarStatus"></div>
+</nav>
 
-  <!-- Right Panel -->
-  <aside class="right-panel">
-    <section>
-      <h4>项目状态</h4>
-      <div class="card">
-        <div class="metric"><span>连接</span><span class="badge badge-ok" id="rpConnected">--</span></div>
-        <div class="metric"><span>模型</span><span id="rpModel" style="font-size:12px">--</span></div>
-        <div class="metric"><span>质量门控</span><span id="rpGate" style="font-size:12px">--</span></div>
-      </div>
-    </section>
-    <section>
-      <h4>最近操作</h4>
-      <div id="rpLog" style="max-height:200px;overflow-y:auto">
-        <div class="log-line">等待操作…</div>
-      </div>
-    </section>
-    <section>
-      <h4>快捷操作</h4>
-      <button class="btn-secondary btn-sm" style="width:100%;margin-bottom:4px" onclick="snapshotSave()">保存快照</button>
-      <button class="btn-secondary btn-sm" style="width:100%;margin-bottom:4px" onclick="exportEpub()">导出 EPUB</button>
-      <button class="btn-secondary btn-sm" style="width:100%" onclick="analyzeAll()">全本分析</button>
-    </section>
-  </aside>
+<div class="main">
+  <div class="toolbar">
+    <select id="selGenre"><option>修仙</option></select>
+    <select id="selVolume"><option>1</option></select>
+    <span>卷</span>
+    <input id="selChapter" type="number" value="1" min="1">
+    <span>章</span>
+    <button class="btn-primary" onclick="doWrite()">生成</button>
+    <span class="sep"></span>
+    <select id="selMode" style="width:80px"><option value="quick">快速</option><option value="standard">标准</option><option value="deep">深度</option></select>
+    <span class="sep"></span>
+    <span id="toolbarStatus">就绪</span>
+    <span style="margin-left:auto;font-size:11px;color:var(--text3)" id="clock"></span>
+  </div>
+  <div class="content" id="mainContent"></div>
 </div>
-<div id="toastContainer"></div>
+
+<aside class="right-panel" id="rightPanel">
+  <section><h4>项目</h4>
+    <div class="rp-row"><span>书名</span><span id="rpTitle">--</span></div>
+    <div class="rp-row"><span>体裁</span><span id="rpGenre">--</span></div>
+    <div class="rp-row"><span>总字数</span><span id="rpWords">0</span></div>
+    <div class="rp-row"><span>已完成</span><span id="rpChapters">0章</span></div>
+    <div class="rp-row"><span>角色</span><span id="rpChars">0</span></div>
+    <div class="rp-row"><span>剧情线</span><span id="rpThreads">0</span></div>
+    <div class="rp-row"><span>连接</span><span class="badge bg-ok" id="rpConn">--</span></div>
+  </section>
+  <section><h4>质量</h4>
+    <div id="rpGate" style="font-size:11px">--</div>
+    <div id="rpDiversity" style="font-size:11px;margin-top:4px">--</div>
+  </section>
+  <section><h4>操作</h4>
+    <button class="btn-secondary btn-block" onclick="doSnapshot()">📸 保存快照</button>
+    <button class="btn-secondary btn-block" onclick="doExport()">📦 导出 EPUB</button>
+    <button class="btn-secondary btn-block" onclick="doAnalyze()">📊 全本分析</button>
+    <button class="btn-secondary btn-block" onclick="doContinuity()">🔍 连续性检查</button>
+    <button class="btn-secondary btn-block" onclick="doDeAI()">🧹 去AI检测</button>
+  </section>
+  <section><h4>最近</h4><div class="rp-log" id="rpLog"><div>等待操作…</div></div></section>
+</aside>
+</div>
+<div id="toasts"></div>
 
 <script>
-// ── Tab switching ──
-document.querySelectorAll('#sidebarNav button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#sidebarNav button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const tab = btn.dataset.tab;
-    ['write','outline','dashboard','files','settings'].forEach(t => {
-      document.getElementById('tab-'+t).style.display = t===tab ? '' : 'none';
-    });
-    if (tab==='dashboard') loadDashboard();
-    if (tab==='files') loadFiles();
-    if (tab==='settings') loadSettingsPanel();
-  });
+// ── State ──
+let currentTab = 'write';
+const TABS = ['write','dashboard','outline','characters','world','audit','memory','logs','settings'];
+let statusData = {};
+
+// ── Tabs ──
+function showTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+  const content = document.getElementById('mainContent');
+  content.innerHTML = panels[name] || panels['write'];
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'characters') loadCharacters();
+  if (name === 'world') loadWorld();
+  if (name === 'audit') loadAudit();
+  if (name === 'memory') loadMemory();
+  if (name === 'logs') loadLogs();
+  if (name === 'settings') loadSettings();
+  if (name === 'outline') loadOutline();
+}
+document.querySelectorAll('.sidebar-nav button').forEach(b => {
+  b.addEventListener('click', () => showTab(b.dataset.tab));
 });
 
-// ── Toast ──
-function toast(msg, ok=true) {
-  const c = document.getElementById('toastContainer');
-  const d = document.createElement('div');
-  d.className = `toast ${ok?'toast-ok':'toast-err'}`;
-  d.textContent = msg;
-  c.appendChild(d);
-  setTimeout(() => d.remove(), 3000);
-}
-
-// ── API helpers ──
+// ── API ──
 async function api(url, opts={}) {
   try { const r = await fetch(url, opts); return r.ok ? r.json() : null; }
-  catch(e) { toast('网络错误: '+e.message, false); return null; }
+  catch(e) { toast('网络错误',false); return null; }
 }
-
-// ── Status ──
-async function loadStatus() {
-  const r = await api('/api/status');
-  if (!r) return;
-  document.getElementById('modelStatus').textContent = '模型: '+r.provider;
-  document.getElementById('wordCount').textContent = '字数: '+(r.chapters||[]).reduce((s,c)=>s+(c.words||0),0);
-  document.getElementById('sidebarStatus').textContent = r.title||'未命名项目';
-  document.getElementById('rpConnected').textContent = r.connected?'在线':'离线';
-  document.getElementById('rpConnected').className = r.connected?'badge badge-ok':'badge badge-err';
-  document.getElementById('rpModel').textContent = r.model||'--';
-  const gate = r.last_gate;
-  document.getElementById('rpGate').textContent = gate ? `${gate.score}分 ${gate.verdict}` : '无记录';
-  document.getElementById('rpGate').className = gate&&gate.verdict==='PASS'?'badge badge-ok':'badge badge-warn';
-  rpLog('状态刷新');
+function toast(msg, ok=true) {
+  const c = document.getElementById('toasts');
+  const d = document.createElement('div');
+  d.className = `toast ${ok?'toast-ok':'toast-err'}`;
+  d.textContent = msg; c.appendChild(d);
+  setTimeout(() => d.remove(), 2500);
 }
 function rpLog(msg) {
   const el = document.getElementById('rpLog');
-  const t = new Date().toLocaleTimeString();
-  el.innerHTML += `<div class="log-line">${t} ${msg}</div>`;
-  if (el.children.length > 20) el.firstElementChild.remove();
+  el.innerHTML = `<div>${new Date().toLocaleTimeString()} ${msg}</div>` + el.innerHTML;
+  if (el.children.length > 30) el.lastElementChild.remove();
 }
 
-// ── Write ──
-async function startWrite() {
-  const vol = parseInt(document.getElementById('volumeSelect').value);
-  const ch = parseInt(document.getElementById('chapterInput').value);
-  const mode = document.getElementById('cfgMode')?.value || 'quick';
-  const output = document.getElementById('editorOutput');
-  output.textContent = '生成中…';
-  rpLog(`开始生成 V${vol}C${ch}`);
+// ── Status ──
+async function refreshStatus() {
+  const r = await api('/api/status');
+  if (!r) return;
+  statusData = r;
+  document.getElementById('sidebarTitle').textContent = r.title || 'Novel-Claude';
+  document.getElementById('sidebarStatus').textContent = `${r.provider} · ${r.model?.slice(0,15)||'?'}`;
+  document.getElementById('sidebarDot').style.background = r.connected ? 'var(--success)' : 'var(--danger)';
+  document.getElementById('toolbarStatus').textContent = r.connected ? '在线' : '离线';
+  document.getElementById('rpTitle').textContent = r.title||'--';
+  document.getElementById('rpGenre').textContent = r.genre||'--';
+  document.getElementById('rpWords').textContent = (r.chapters||[]).reduce((s,c)=>s+(c.words||0),0).toLocaleString();
+  document.getElementById('rpChapters').textContent = `${r.chapter_count||0}章`;
+  document.getElementById('rpChars').textContent = r.char_count||0;
+  document.getElementById('rpThreads').textContent = r.thread_count||0;
+  document.getElementById('rpConn').textContent = r.connected?'在线':'离线';
+  document.getElementById('rpConn').className = r.connected?'badge bg-ok':'badge bg-err';
+  if (r.last_gate) {
+    const g = r.last_gate;
+    document.getElementById('rpGate').innerHTML = `门控: <b>${g.score}分</b> ${g.verdict} · 第${g.round}轮`;
+  }
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+refreshStatus(); setInterval(refreshStatus, 15000);
 
+// ── Write ──
+async function doWrite() {
+  const vol = parseInt(document.getElementById('selVolume').value)||1;
+  const ch = parseInt(document.getElementById('selChapter').value)||1;
+  const mode = document.getElementById('selMode').value;
+  const output = document.getElementById('writeOutput');
+  output.textContent = '生成中…'; rpLog(`开始生成 V${vol}C${ch}`);
   try {
     const r = await fetch(`/api/write-stream?mode=${mode}`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({volume:vol, chapter:ch})
     });
-    const reader = r.body.getReader();
-    const decoder = new TextDecoder();
+    const reader = r.body.getReader(); const decoder = new TextDecoder();
     let full = '';
     while (true) {
       const {done, value} = await reader.read();
       if (done) break;
-      const text = decoder.decode(value);
-      for (const line of text.split('\n')) {
-        if (line.startsWith('data: ')) {
-          try {
-            const d = JSON.parse(line.slice(6));
-            if (d.type==='stream'||d.type==='token') { full += d.text||d.token; output.textContent = full; }
-            else if (d.type==='done'||d.type==='complete') {
-              output.textContent = full || d.path || '完成';
-              document.getElementById('chapterInput').value = ch+1;
-              const ws = d.words||full.length;
-              toast(`生成完成: ${ws}字`, true);
-              rpLog(`V${vol}C${ch} 完成 (${ws}字, gate:${d.gate_verdict||'none'})`);
-            }
-            else if (d.type==='error') { output.textContent = '错误: '+d.msg; toast(d.msg, false); }
-            else if (d.type==='agent_progress') { output.textContent = `Agent: ${d.stage} (${Math.round(d.progress*100)}%)`; }
-            else if (d.type==='agent_result') {
-              output.textContent = full;
-              toast(`${d.score}分, ${d.revision_rounds||0}轮修订`, d.score>=70);
-            }
-            else if (d.type==='status') { output.textContent = d.msg; }
-          } catch(e) {}
-        }
+      for (const line of decoder.decode(value).split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const d = JSON.parse(line.slice(6));
+          if (d.type==='stream'||d.type==='token') { full += d.text||d.token; output.textContent = full; }
+          else if (d.type==='done'||d.type==='complete') {
+            output.textContent = full;
+            const wc = d.words||full.length;
+            document.getElementById('writeWords').textContent = wc;
+            document.getElementById('writeGate').textContent = d.gate_verdict||'无';
+            document.getElementById('selChapter').value = ch+1;
+            toast(`完成: ${wc}字`, true);
+            rpLog(`V${vol}C${ch} 完成(${wc}字) gate:${d.gate_verdict||'none'}`);
+            refreshStatus();
+          }
+          else if (d.type==='error') { output.textContent = '错误: '+d.msg; toast(d.msg, false); }
+          else if (d.type==='agent_progress') { output.textContent = `Agent: ${d.stage} (${Math.round(d.progress*100)}%)`; }
+          else if (d.type==='agent_result') { output.textContent = full; }
+          else if (d.type==='status') { output.textContent = d.msg; }
+        } catch(e) {}
       }
     }
   } catch(e) { toast('生成失败: '+e.message, false); }
+  refreshStatus();
 }
 
 // ── Dashboard ──
 async function loadDashboard() {
-  const r = await api('/api/status');
-  if (!r) return;
-  document.getElementById('dashTotalWords').textContent = (r.chapters||[]).reduce((s,c)=>s+(c.words||0),0).toLocaleString();
+  const r = await api('/api/status'); if (!r) return;
+  const words = (r.chapters||[]).reduce((s,c)=>s+(c.words||0),0);
+  document.getElementById('dashWords').textContent = words.toLocaleString();
   document.getElementById('dashChapters').textContent = r.chapter_count||0;
   document.getElementById('dashChars').textContent = r.char_count||0;
   document.getElementById('dashThreads').textContent = r.thread_count||0;
   if (r.last_gate) {
-    document.getElementById('dashGate').innerHTML = `<b>${r.last_gate.score}分 (${r.last_gate.verdict})</b> · 第${r.last_gate.round}轮 · 严重问题:${r.last_gate.critical}`;
+    const g = r.last_gate;
+    document.getElementById('dashGate').innerHTML = `<b>${g.score}分 (${g.verdict})</b> · ${g.round}轮 · 严重:${g.critical}`;
   }
-  // Load diversity
   const d = await api('/api/diversity');
-  if (d && d.score!==undefined) {
-    document.getElementById('dashDiversity').innerHTML = `<b>${d.score}/100</b> · ${d.chapters?.length||0}章分析 · ${d.issues?.[0]||'无问题'}`;
+  if (d?.score !== undefined) {
+    document.getElementById('dashDiversity').innerHTML = `<b>${d.score}/100</b> · ${d.chapters?.length||0}章 · ${d.issues?.[0]||'良'}`;
   }
 }
 
-// ── Files ──
-async function loadFiles() {
-  const r = await api('/api/files/list');
-  if (!r) return;
-  document.getElementById('fileList').innerHTML = r.files ? r.files.map(f=>`<div style="padding:4px 0;border-bottom:1px solid var(--border)">${f}</div>`).join('') : '无文件';
+// ── Characters ──
+async function loadCharacters() {
+  const r = await api('/api/status'); if (!r) return;
+  const chars = r.chapters || [];
+  let html = '<h3>角色管理</h3>';
+  html += `<p>角色数: ${r.char_count||0} | 剧情线: ${r.thread_count||0}</p>`;
+  html += '<div class="card"><h4>最近章节</h4><table><tr><th>章</th><th>标题</th><th>状态</th><th>字数</th></tr>';
+  for (const c of (r.chapters||[]).slice(-10).reverse()) {
+    html += `<tr><td>${c.num}</td><td>${c.title||''}</td><td>${c.status||''}</td><td>${c.words||0}</td></tr>`;
+  }
+  html += '</table></div>';
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+// ── World ──
+async function loadWorld() {
+  const r = await api('/api/status'); if (!r) return;
+  let html = '<h3>世界观管理</h3>';
+  html += `<p>书名: ${r.title||'--'} | 体裁: ${r.genre||'--'} | 模型: ${r.model||'--'}</p>`;
+  html += '<div class="card"><h4>模块状态</h4>';
+  const mods = r.modules||{};
+  for (const [k,v] of Object.entries(mods)) {
+    html += `<div class="rp-row"><span>${k}</span><span class="badge ${v?'bg-ok':'bg-warn'}">${v?'启用':'禁用'}</span></div>`;
+  }
+  html += '</div>';
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+// ── Audit ──
+async function loadAudit() {
+  let html = '<h3>审阅面板</h3>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px">';
+  html += '<button class="btn-primary btn-sm" onclick="doContinuity()">连续性检查</button>';
+  html += '<button class="btn-primary btn-sm" onclick="doDeAI()">去AI检测</button>';
+  html += '<button class="btn-secondary btn-sm" onclick="doAnalyze()">全本分析</button>';
+  html += '</div>';
+  html += '<div class="card"><h4>质量门控</h4><div id="auditGate">点击检查…</div></div>';
+  html += '<div class="card" style="margin-top:8px"><h4>多样性</h4><div id="auditDiversity">点击加载…</div></div>';
+  document.getElementById('mainContent').innerHTML = html;
+  const qr = await api('/api/quality-gate');
+  if (qr?.available) {
+    document.getElementById('auditGate').innerHTML = `<pre style="font-size:11px">${qr.formatted||qr.result?.overall_score+'分'}</pre>`;
+  } else { document.getElementById('auditGate').textContent = '暂无门控记录'; }
+  const dr = await api('/api/diversity');
+  if (dr?.score!==undefined) {
+    document.getElementById('auditDiversity').innerHTML = `<b>${dr.score}/100</b> · ${dr.issues?.join('<br>')||''}`;
+  }
+}
+
+// ── Memory ──
+async function loadMemory() {
+  const r = await api('/api/status'); if (!r) return;
+  let html = '<h3>记忆面板</h3>';
+  html += `<p>日志路径: ${r.modules?.log_path||'~'}</p>`;
+  html += '<div class="card"><h4>最近日志</h4><div id="memLogs">加载中…</div></div>';
+  html += '<div class="card" style="margin-top:8px"><h4>快照</h4><div id="memSnaps">加载中…</div></div>';
+  document.getElementById('mainContent').innerHTML = html;
+  const lr = await api('/api/logs?lines=20');
+  if (lr?.available) {
+    document.getElementById('memLogs').innerHTML = lr.lines.map(l=>`<div style="font-size:11px;font-family:monospace">${l}</div>`).join('');
+  }
+  const sr = await api('/api/snapshots');
+  if (sr?.snapshots?.length) {
+    document.getElementById('memSnaps').innerHTML = sr.snapshots.map(s=>`<div>${s.id.slice(0,15)}… ${s.label||''} (${s.chapter_count}章)</div>`).join('');
+  } else { document.getElementById('memSnaps').textContent = '暂无快照'; }
+}
+
+// ── Logs ──
+async function loadLogs() {
+  const r = await api('/api/logs?lines=50');
+  if (!r?.available) { document.getElementById('mainContent').innerHTML = '<h3>日志</h3><p>无日志文件</p>'; return; }
+  let html = `<h3>日志 (${r.total_lines}行, ${r.size_kb}KB)</h3>`;
+  html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;max-height:500px;overflow-y:auto;font-family:monospace;font-size:11px">';
+  html += r.lines.map(l => `<div>${l}</div>`).join('');
+  html += '</div>';
+  document.getElementById('mainContent').innerHTML = html;
 }
 
 // ── Settings ──
-async function loadSettingsPanel() {
-  const r = await api('/api/config');
-  if (!r) return;
-  document.getElementById('cfgGenre').innerHTML = (r.genres||['修仙','玄幻','都市']).map(g=>`<option>${g}</option>`).join('');
-  document.getElementById('cfgStyle').innerHTML = (r.styles||['网文爽文','古龙风格']).map(s=>`<option>${s}</option>`).join('');
+async function loadSettings() {
+  const r = await api('/api/config'); if (!r) return;
+  let html = '<h3>设置</h3>';
+  html += '<div class="card" style="margin-bottom:8px"><h4>写作参数</h4>';
+  html += `<label>体裁 <select id="cfgGenre">${(r.genres||['修仙']).map(g=>`<option>${g}</option>`).join('')}</select></label> `;
+  html += `<label>风格 <select id="cfgStyle">${(r.styles||['网文爽文']).map(s=>`<option>${s}</option>`).join('')}</select></label> `;
+  html += `<label>模式 <select id="cfgMode"><option>quick</option><option>standard</option><option>deep</option></select></label>`;
+  html += `<button class="btn-primary btn-sm" style="margin-left:8px" onclick="saveCfg()">保存</button></div>`;
+  html += '<div class="card" style="margin-bottom:8px"><h4>故事结构</h4>';
+  html += `<select id="cfgSF"><option value="">无</option><optgroup label="西方经典"><option value="revenge">复仇悲剧</option><option value="rise_to_power">英雄之旅</option></optgroup><optgroup label="中国网文"><option value="fanren">凡人流</option><option value="doupo">废材成帝</option><option value="guimi">克苏鲁</option><option value="dageng">案件驱动</option><option value="xuezhong">群像江湖</option><option value="fuhan">英雄争霸</option><option value="urban">都市逆袭</option></optgroup></select>`;
+  html += `<button class="btn-primary btn-sm" style="margin-left:8px" onclick="saveSF()">应用</button></div>`;
+  html += '<div class="card"><h4>模型</h4>';
+  html += `<div class="rp-row"><span>连接</span><span>${r.provider||'?'} · ${r.model||'?'}</span></div>`;
+  html += `<button class="btn-secondary btn-sm" onclick="doModelSwitch()">切换模型</button></div>`;
+  document.getElementById('mainContent').innerHTML = html;
 }
-async function saveSettings() {
-  const genre = document.getElementById('cfgGenre').value;
-  const style = document.getElementById('cfgStyle').value;
-  const mode = document.getElementById('cfgMode').value;
-  await api('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({genre,style,workflow:{mode}})});
-  toast('设置已保存');
+async function saveCfg() {
+  await api('/api/config', {method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({genre:document.getElementById('cfgGenre').value, style:document.getElementById('cfgStyle').value, workflow:{mode:document.getElementById('cfgMode').value}})});
+  toast('设置已保存'); refreshStatus();
 }
-async function saveStoryform() {
-  const tpl = document.getElementById('cfgStoryform').value;
-  if (!tpl) return;
-  await api('/api/storyform', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({template:tpl})});
+async function saveSF() {
+  const t = document.getElementById('cfgSF').value; if(!t) return;
+  await api('/api/storyform', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({template:t})});
   toast('故事结构已应用');
 }
 
-// ── Quick actions ──
-async function analyzeChapter() {
-  const r = await api('/api/analyze');
-  if (r?.report) toast(`分析完成: ${r.report.total_chapters}章, ${r.report.total_words}字`);
-}
-async function exportChapter() {
-  const r = await api('/api/export', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({format:'epub'})});
-  if (r?.ok) toast(`导出: ${r.path}`);
-}
-async function analyzeAll() {
-  const r = await api('/api/analyze');
-  if (r?.report) {
-    const reps = r.report;
-    toast(`${reps.total_chapters}章 · ${reps.total_words.toLocaleString()}字 · ${reps.pacing_issues?.length||0}节奏问题`);
+// ── Actions ──
+async function doSnapshot() { const r = await api('/api/snapshots', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({label:new Date().toLocaleString()})}); if(r?.ok) toast('快照已保存'); rpLog('快照保存'); }
+async function doExport() { const r = await api('/api/export', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({format:'epub'})}); if(r?.ok) toast(`导出: ${r.path}`); }
+async function doAnalyze() { const r = await api('/api/analyze'); if(r?.report) toast(`${r.report.total_chapters}章·${r.report.total_words.toLocaleString()}字·${r.report.pacing_issues?.length||0}节奏问题`); }
+async function doContinuity() { const r = await api('/api/continuity'); if(r) toast(`检查完成: ${r.findings?.length||0}个发现`); }
+async function doDeAI() { const vol=document.getElementById('selVolume')?.value||1; const ch=document.getElementById('selChapter')?.value||1; const r = await api(`/api/deai?volume=${vol}&chapter=${ch}`); if(r) toast(`DeAI: ${r.overall_score||'?'}分`); }
+async function doModelSwitch() { const r = await api('/api/models'); if(r) { const m=prompt('可用模型:\n'+r.models?.join('\n')+'\n\n输入模型名:'); if(m) {await api('/api/models/switch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:m})}); toast('已切换'); refreshStatus(); } } }
+
+// ── Panels ──
+const panels = {
+  write: `<div class="panel panel-write"><div class="inner"><h3>写作</h3><div class="output" id="writeOutput">点击"生成"开始创作…</div><div class="status-bar"><span>字数: <b id="writeWords">0</b></span><span>门控: <b id="writeGate">--</b></span></div></div></div>`,
+  dashboard: `<div class="panel"><h3>总览</h3><div class="panel-grid"><div class="card"><h4>总字数</h4><div class="val" id="dashWords">0</div></div><div class="card"><h4>已完成</h4><div class="val" id="dashChapters">0</div></div><div class="card"><h4>角色</h4><div class="val" id="dashChars">0</div></div><div class="card"><h4>剧情线</h4><div class="val" id="dashThreads">0</div></div><div class="card wide"><h4>质量门控</h4><div id="dashGate">--</div></div><div class="card wide"><h4>叙事多样性</h4><div id="dashDiversity">--</div></div></div></div>`,
+  outline: `<div class="panel"><h3>大纲管理</h3><textarea id="outlineText" style="width:100%;min-height:300px;font-family:monospace" placeholder="加载中…"></textarea><div style="margin-top:8px;display:flex;gap:8px"><button class="btn-primary btn-sm" id="outlineSave">保存</button><button class="btn-secondary btn-sm" id="outlineLoad">加载</button></div></div>`,
+  characters: `<div class="panel"><h3>角色管理</h3><p>加载中…</p></div>`,
+  world: `<div class="panel"><h3>世界观管理</h3><p>加载中…</p></div>`,
+  audit: `<div class="panel"><h3>审阅面板</h3><p>加载中…</p></div>`,
+  memory: `<div class="panel"><h3>记忆面板</h3><p>加载中…</p></div>`,
+  logs: `<div class="panel"><h3>日志</h3><p>加载中…</p></div>`,
+  settings: `<div class="panel"><h3>设置</h3><p>加载中…</p></div>`,
+};
+
+// ── Outline handlers ──
+document.addEventListener('click', async (e) => {
+  if (e.target.id === 'outlineSave') {
+    const text = document.getElementById('outlineText')?.value;
+    if (text) { await api('/api/outline', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content:text})}); toast('大纲已保存'); }
   }
-}
-async function exportEpub() {
-  const r = await api('/api/export', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({format:'epub'})});
-  if (r?.ok) toast(`EPUB已生成: ${r.path}`);
-}
-async function snapshotSave() {
-  const r = await api('/api/snapshots', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({label:new Date().toLocaleString()})});
-  if (r?.ok) toast('快照已保存');
-}
-async function loadOutline() {
-  const r = await api('/api/outline');
-  if (r?.outline) document.getElementById('outlineText').value = r.outline;
-}
-async function saveOutline() {
-  const text = document.getElementById('outlineText').value;
-  await api('/api/outline', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content:text})});
-  toast('大纲已保存');
-}
+  if (e.target.id === 'outlineLoad') {
+    const r = await api('/api/outline');
+    if (r?.outline) { document.getElementById('outlineText').value = r.outline; }
+  }
+});
 
 // ── Init ──
-loadStatus();
-setInterval(loadStatus, 30000); // auto-refresh every 30s
+showTab('write');
 </script>
 </body>
 </html>
