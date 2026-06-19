@@ -1,5 +1,5 @@
 import sys, os, json
-sys.path.insert(0, r'C:\Users\abee\ai-novel-frameworks\Novel-Claude')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 passed = 0
 failed = 0
@@ -17,14 +17,14 @@ print('=== 1. Model Routing ===')
 from utils.llm_client import get_task_model, get_task_client
 from utils.llm_client import _llm_temperature, _llm_frequency_penalty, _llm_presence_penalty, _llm_top_p
 
-check('planning model -> Opus', 'opus' in get_task_model('planning').lower())
+check('planning model -> Uncensored', 'uncensored' in get_task_model('planning').lower())
 check('writing model -> Uncensored', 'uncensored' in get_task_model('writing').lower())
-check('reasoning model -> Opus', 'opus' in get_task_model('reasoning').lower())
+check('reasoning model -> Uncensored', 'uncensored' in get_task_model('reasoning').lower())
 check('planning temp=0.6', abs(_llm_temperature('planning') - 0.6) < 0.01)
 check('writing temp=0.9', abs(_llm_temperature('writing') - 0.9) < 0.01)
 check('reasoning temp=0.5', abs(_llm_temperature('reasoning') - 0.5) < 0.01)
 check('deai temp=0.7', abs(_llm_temperature('deai') - 0.7) < 0.01)
-check('writing freq_pen=0.3', abs(_llm_frequency_penalty('writing') - 0.3) < 0.01)
+check('writing freq_pen=0.25', abs(_llm_frequency_penalty('writing') - 0.25) < 0.01)
 check('deai freq_pen=0.4', abs(_llm_frequency_penalty('deai') - 0.4) < 0.01)
 check('writing top_p=0.95', abs(_llm_top_p('writing') - 0.95) < 0.01)
 
@@ -39,7 +39,7 @@ e = GenDeaiEngineSkill(Ctx())
 ai_text = '他缓缓地抬起头，微微皱眉，心中不由得一震。不禁倒吸一口凉气，顿时感到百感交集、五味杂陈。她静静地站在那，幽幽地叹了一口气，仿佛整个世界都安静了，宛如一幅画卷缓缓展开。嘴角微微上扬，眼神中闪过一丝复杂的神色。'
 r = e.analyze(ai_text)
 check('AI text score < 80', r['overall_score'] < 80)
-check('8 dimensions', len(r['dimensions']) == 8)
+check('9 dimensions (L1-L9)', len(r['dimensions']) == 9)
 check('L3 adj_density', 'density' in r.get('adj_density', {}))
 check('L4 idiom_density', 'density' in r.get('idiom_density', {}))
 check('L5 para_variation', 'variance' in r.get('para_variation', {}))
@@ -58,18 +58,18 @@ from skills.wf_mo_shen_workflow.skill import (
     ARCHITECT_SYSTEM, SCRIBE_SYSTEM, EDITOR_SYSTEM,
     POLISHER_SYSTEM, GATEKEEPER_SYSTEM
 )
-check('Architect: plan method', '章内计划方法论' in ARCHITECT_SYSTEM)
-check('Architect: evidence carriers', '证据载体' in ARCHITECT_SYSTEM)
-check('Architect: opponent escalation', '反制' in ARCHITECT_SYSTEM)
-check('Scribe: verb priority', '动词优先' in SCRIBE_SYSTEM)
-check('Scribe: hard rules', '硬规则' in SCRIBE_SYSTEM)
-check('Scribe: banned words', '不禁' in SCRIBE_SYSTEM)
-check('Editor: narrative scan', '叙事层面检测' in EDITOR_SYSTEM)
+check('Architect: scene decomposition', '场景' in ARCHITECT_SYSTEM)
+check('Scribe: dialogue 30%', '30%' in SCRIBE_SYSTEM)
+check('Scribe: banned words', '前所未有' in SCRIBE_SYSTEM)
+check('Editor: hook check', '章末钩子' in EDITOR_SYSTEM)
+check('Editor: POV lock', '视角' in EDITOR_SYSTEM)
+check('Polisher: externalize emotion', '心理描写外化' in POLISHER_SYSTEM)
+check('Gatekeeper: 5 dims', '追读力' in GATEKEEPER_SYSTEM)
 check('Editor: moralizing check', '说教' in EDITOR_SYSTEM)
-check('Polisher: 12 techniques', '思维中断' in POLISHER_SYSTEM)
-check('Polisher: sensory intrusion', '感官侵入' in POLISHER_SYSTEM)
-check('Gatekeeper: 10 dimensions', 'sensory_richness' in GATEKEEPER_SYSTEM)
-check('Gatekeeper: evidence_density', 'evidence_density' in GATEKEEPER_SYSTEM)
+check('Polisher: externalize emotion', '心理描写外化' in POLISHER_SYSTEM)
+check('Polisher: remove ending summary', '删结尾升华' in POLISHER_SYSTEM)
+check('Gatekeeper: 5 dims', '追读力' in GATEKEEPER_SYSTEM)
+check('Gatekeeper: AI flavor', 'AI味' in GATEKEEPER_SYSTEM)
 
 # 4. Genre/style injection
 print('=== 4. Genre/Style Injection ===')

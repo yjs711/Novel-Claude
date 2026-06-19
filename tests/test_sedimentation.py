@@ -98,3 +98,29 @@ class TestJsonParsing:
         data = {"plot_advances": ["test"]}
         result = validate_light_extract(data)
         assert result is None
+
+
+if __name__ == "__main__":
+    passed = 0; failed = 0
+    tests = [
+        ("valid light extract", TestLightExtract().test_valid_light_extract),
+        ("missing fields rejected", TestLightExtract().test_invalid_light_extract_missing_field),
+        ("to_dict roundtrip", TestLightExtract().test_light_extract_to_dict),
+        ("valid deep extract", TestDeepExtract().test_valid_deep_extract),
+        ("cosine identical", TestDedup().test_cosine_similarity_identical),
+        ("cosine different", TestDedup().test_cosine_similarity_different),
+        ("duplicate detection", TestDedup().test_is_duplicate),
+        ("light prompt JSON", TestPrompts().test_light_prompt_contains_json_instruction),
+        ("deep prompt JSON", TestPrompts().test_deep_prompt_contains_json_instruction),
+        ("malformed JSON rejected", TestJsonParsing().test_malformed_json_returns_none),
+        ("partial JSON rejected", TestJsonParsing().test_partial_json_rejected),
+    ]
+    for name, fn in tests:
+        try:
+            fn()
+            print(f"  [PASS] {name}")
+            passed += 1
+        except Exception as e:
+            print(f"  [FAIL] {name}: {e}")
+            failed += 1
+    print(f"\nTOTAL: {passed}P/{failed}F {'FAILURES' if failed else 'ALL PASS'}")
