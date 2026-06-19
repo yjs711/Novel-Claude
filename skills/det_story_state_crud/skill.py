@@ -65,7 +65,7 @@ class DetStoryStateCrudSkill(BaseSkill):
             blueprint = json.load(f)
 
         # Extract characters from blueprint
-        char_entries = blueprint.get("characters", [])
+        char_entries = blueprint.get("character_cards", [])
         for entry in char_entries:
             char_id = entry.get("name", f"char_{len(self._state.characters)}")
             # normalize id

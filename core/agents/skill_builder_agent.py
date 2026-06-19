@@ -1,8 +1,65 @@
+import ast
 import json
 import os
-from utils.llm_client import client, MODEL_ID
+import py_compile
+from utils.llm_client import _get_client, resolve_model
 from core.novel_context import NovelContext
 from core.plugin_manager import PluginManager
+
+# Dangerous imports that generated code must not use
+_BLOCKED_IMPORTS = {
+    "os", "subprocess", "socket", "shutil", "sys", "ctypes",
+    "importlib", "pickle", "eval", "exec", "compile",
+    "requests", "urllib", "http",
+}
+
+
+def _validate_skill_code(code: str, filepath: str) -> bool:
+    """Validate generated skill code before hot-reload. Returns True if safe."""
+    # 1. Syntax check via py_compile
+    try:
+        py_compile.compile(filepath, doraise=True)
+    except py_compile.PyCompileError as e:
+        print(f"  [!] Syntax error in generated code: {e}")
+        return False
+
+    # 2. AST scan for dangerous imports/calls
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        print(f"  [!] AST parse failed: {e}")
+        return False
+
+    for node in ast.walk(tree):
+        # Block dangerous imports
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.split(".")[0] in _BLOCKED_IMPORTS:
+                    print(f"  [!] Blocked import: {alias.name}")
+                    return False
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and node.module.split(".")[0] in _BLOCKED_IMPORTS:
+                print(f"  [!] Blocked import from: {node.module}")
+                return False
+        # Block eval/exec/compile calls
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec", "compile"):
+                print(f"  [!] Blocked function call: {node.func.id}")
+                return False
+
+    # 3. Check BaseSkill inheritance
+    has_base_skill = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            for base in node.bases:
+                if isinstance(base, ast.Name) and base.id == "BaseSkill":
+                    has_base_skill = True
+    if not has_base_skill:
+        print(f"  [!] Generated code does not inherit from BaseSkill")
+        return False
+
+    return True
+
 
 class SkillBuilderAgent:
     """
@@ -57,8 +114,11 @@ class SkillBuilderAgent:
             {"role": "user", "content": f"请为我开发一个外挂插件。需求:\n{user_request}\n\n完成后请调用 save_skill_code 工具写入系统。"}
         ]
         
+        from utils.llm_client import resolve_provider, resolve_model, _get_client
+        client = _get_client()
+        model = resolve_model(resolve_provider())
         response = client.chat.completions.create(
-            model=MODEL_ID,
+            model=model,
             messages=messages,
             tools=self.get_tools(),
             temperature=0.2
@@ -91,8 +151,13 @@ class SkillBuilderAgent:
                 with open(skill_file, "w", encoding="utf-8") as f:
                     f.write(code)
                     
-                print(f"[✓] 插件代码已生成并写入: {skill_file}")
-                
+                print(f"[OK] 插件代码已生成并写入: {skill_file}")
+
+                # Safety check before hot-reload
+                if not _validate_skill_code(code, skill_file):
+                    print(f"[!] 安全校验失败，插件代码被拒绝加载")
+                    return False
+
                 # 热更新加载
                 self.plugin_mgr.hot_reload(folder_name)
                 return True
