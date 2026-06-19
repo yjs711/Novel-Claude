@@ -148,13 +148,27 @@ class MemWorkingMemorySkill(BaseSkill):
             if knowledge_lines:
                 parts.append("\n[角色已知信息 — 避免重复发现]\n" + "\n".join(knowledge_lines))
 
-        # 活跃剧情线
-        active = [t for t in story_state.plot_threads.values() if t.status == "active"]
-        if active:
-            parts.append("\n活跃剧情线:")
-            for t in active[:8]:
-                parts.append(f"  ▸ {t.name} (P{t.priority}): {t.description[:60]}")
-                if t.target_resolution_chapter:
-                    parts.append(f"    收束目标: 第{t.target_resolution_chapter}章")
+        # 活跃剧情线（含健康状态 — 支线管理）
+        from core.subplot_manager import assess_threads
+        thread_statuses = assess_threads(story_state, self.context.current_chapter_id)
+        if thread_statuses:
+            parts.append("\n剧情线状态:")
+            for t in thread_statuses[:8]:
+                # Health markers
+                icon = {"overdue": "[!!!]", "dormant": "[~]", "healthy": "[OK]",
+                        "resolved": "[v]", "abandoned": "[x]"}.get(t.health, "[?]")
+                parts.append(f"  {icon} {t.thread_name} ({t.thread_type}, P{t.priority})")
+                if t.health == "overdue":
+                    parts.append(f"    MUST ADVANCE: {t.chapters_dormant}章未推进" +
+                                (f", 目标第{t.target_chapter}章已过" if t.target_chapter else ""))
+                elif t.health == "dormant":
+                    parts.append(f"    需关注: {t.chapters_dormant}章未推进")
+                if t.target_chapter and t.health != "resolved":
+                    parts.append(f"    收束目标: 第{t.target_chapter}章")
+
+            # Thread balance hint (StoryScope: 79% AI stories lack subplots)
+            active_count = sum(1 for t in thread_statuses if t.health in ("overdue", "dormant", "healthy"))
+            if active_count <= 1:
+                parts.append("  [Hint] 当前仅有1条活跃线。考虑引入支线/感情线制造多线张力。")
 
         return "\n".join(parts) if parts else ""
