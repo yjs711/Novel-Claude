@@ -3,9 +3,12 @@ import sys
 import importlib.util
 from typing import Dict, Any
 
+from utils.logger import get_logger
 from core.novel_context import NovelContext
 from core.event_bus import event_bus
 from core.base_skill import BaseSkill
+
+logger = get_logger(__name__)
 
 class PluginManager:
     """
@@ -22,7 +25,7 @@ class PluginManager:
             os.makedirs(self.skills_dir, exist_ok=True)
             return
 
-        print(f"[PluginManager] 正在扫描 {self.skills_dir} 目录下的插件...")
+        logger.info("Scanning %s for plugins...", self.skills_dir)
         for item in os.listdir(self.skills_dir):
             plugin_path = os.path.join(self.skills_dir, item)
             if os.path.isdir(plugin_path) and not item.startswith("__") and not item.startswith("."):
@@ -61,17 +64,14 @@ class PluginManager:
                 # 触发 on_init
                 try:
                     skill_instance.on_init()
-                    print(f"  [✓] 加载插件成功: {skill_instance.name}")
+                    logger.success("Plugin loaded: %s", skill_instance.name)
                 except Exception as e:
-                    print(f"  [🚨] 插件 {skill_instance.name} 初始化(on_init)失败: {e}")
+                    logger.error("Plugin '%s' on_init failed: %s", skill_instance.name, e, exc_info=True)
             else:
-                print(f"  [WARN] 在 {file_path} 中未找到继承自 BaseSkill 的有效类。")
+                logger.warning("No BaseSkill subclass found in %s", file_path)
 
         except Exception as e:
-            try:
-                print(f"  [🚨] 加载插件模块 {module_name} 崩溃: {e}")
-            except UnicodeEncodeError:
-                print(f"  [ERROR] 加载插件模块 {module_name} 崩溃: {e}".encode('gbk', 'replace').decode('gbk'))
+            logger.error("Failed to load plugin module '%s': %s", module_name, e, exc_info=True)
 
     def hot_reload(self, module_name: str):
         """

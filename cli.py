@@ -2,6 +2,10 @@ import click
 import os
 import sys
 
+# ── Logging: configure ONCE before everything ──
+from utils.logger import setup_logging
+setup_logging()
+
 # Check for interactive mode flag BEFORE importing other modules
 if '--interactive' in sys.argv or '-i' in sys.argv:
     from cli.repl import start_repl
@@ -529,3 +533,51 @@ if __name__ == '__main__':
         traceback.print_exc()
         print(f"\n[ERROR] 执行失败: {e}")
         wait_for_background_tasks()
+
+
+# ── log management ─────────────────────────────────────────────────────
+
+@cli.command()
+@click.option('--lines', '-n', type=int, default=50, help='Number of lines to show')
+@click.option('--level', '-l', type=str, default=None, help='Filter by level: DEBUG, INFO, WARNING, ERROR')
+@click.option('--follow', '-f', is_flag=True, default=False, help='Tail follow mode')
+def logs(lines, level, follow):
+    """View or tail the application log file"""
+    from utils.logger import get_log_path
+    log_path = get_log_path()
+    if not log_path.exists():
+        print(f"[INFO] No log file found at {log_path}")
+        return
+
+    if follow:
+        print(f"Tailing {log_path} (Ctrl+C to stop)...")
+        import subprocess
+        try:
+            subprocess.run(["tail", "-f", str(log_path)])
+        except KeyboardInterrupt:
+            pass
+        return
+
+    with open(log_path, "r", encoding="utf-8") as f:
+        all_lines = f.readlines()
+
+    if level:
+        level_upper = level.upper()
+        all_lines = [l for l in all_lines if f"| {level_upper} " in l]
+
+    for line in all_lines[-lines:]:
+        # Colorize by level
+        if "| ERROR " in line:
+            click.echo(click.style(line.rstrip(), fg="red"))
+        elif "| WARNING " in line:
+            click.echo(click.style(line.rstrip(), fg="yellow"))
+        elif "| SUCCESS " in line:
+            click.echo(click.style(line.rstrip(), fg="green"))
+        elif "| DEBUG " in line:
+            click.echo(click.style(line.rstrip(), fg="bright_black"))
+        else:
+            click.echo(line.rstrip())
+
+    print(f"\n[{all_lines.index(line)+1 if all_lines else 0} lines total, showing last {min(len(all_lines), lines)}]")
+    print(f"Log file: {log_path}")
+    print(f"Size: {log_path.stat().st_size / 1024:.1f} KB")

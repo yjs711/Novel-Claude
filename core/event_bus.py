@@ -1,4 +1,8 @@
 from typing import Callable, List, Any, Dict
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class EventBus:
     """
@@ -17,15 +21,19 @@ class EventBus:
         """注册一个 Skill 到总线"""
         if skill not in self.subscribers:
             self.subscribers.append(skill)
-            
+            logger.debug("Skill registered: %s (total: %d)", skill.name, len(self.subscribers))
+
     def unregister(self, skill):
         """注销一个 Skill"""
         if skill in self.subscribers:
             self.subscribers.remove(skill)
-            
+            logger.debug("Skill unregistered: %s", skill.name)
+
     def clear(self):
         """清空所有订阅者"""
+        count = len(self.subscribers)
         self.subscribers.clear()
+        logger.debug("EventBus cleared, %d subscribers removed", count)
 
     def emit(self, event_name: str, *args, **kwargs):
         """
@@ -40,8 +48,11 @@ class EventBus:
                     res = method(*args, **kwargs)
                     results.append(res)
                 except Exception as e:
-                    print(f"\\n[🚨 EventBus 容错警报] 插件 '{skill.name}' 在执行 '{event_name}' 时崩溃: {e}")
-                    print(f"[EventBus] 已自动隔离该错误并跳过此插件，生成进度继续。\\n")
+                    logger.error(
+                        "Skill '%s' crashed in '%s': %s",
+                        skill.name, event_name, e, exc_info=True,
+                    )
+                    logger.warning("EventBus: isolated error in '%s', continuing", skill.name)
         return results
 
     def emit_pipeline(self, event_name: str, initial_data: Any, *args, **kwargs) -> Any:
@@ -56,8 +67,11 @@ class EventBus:
                 try:
                     data = method(data, *args, **kwargs)
                 except Exception as e:
-                    print(f"\\n[🚨 EventBus 容错警报] 插件 '{skill.name}' 在执行 '{event_name}' 串行处理时崩溃: {e}")
-                    print(f"[EventBus] 已自动隔离该错误，保留前一次的有效数据并继续。\\n")
+                    logger.error(
+                        "Skill '%s' crashed in pipeline '%s': %s",
+                        skill.name, event_name, e, exc_info=True,
+                    )
+                    logger.warning("EventBus: preserving previous data, continuing pipeline")
         return data
 
     def collect(self, method_name: str, *args, **kwargs) -> List[Any]:
@@ -75,8 +89,12 @@ class EventBus:
                     else:
                         collected.append(res)
                 except Exception as e:
-                    print(f"\\n[🚨 EventBus 容错警报] 插件 '{skill.name}' 在调用 '{method_name}' 时崩溃: {e}")
+                    logger.error(
+                        "Skill '%s' failed in '%s': %s",
+                        skill.name, method_name, e, exc_info=True,
+                    )
         return collected
+
 
 # 创建全局单例暴露供使用
 event_bus = EventBus()
