@@ -25,7 +25,7 @@ class HandsomeProtagonistSkill(BaseSkill):
     def on_before_scene_write(self, prompt_payload: list, beat_data: dict) -> list:  
         """在 LLM 动笔前，强行将'主角很帅'塞进它的脑子里"""  
         state = self.context.workspace.safe_read_json(self.state_rel_path)
-        if not state or not state.get("enabled", True):
+        if not state or not state.get("enabled", False):  # disabled by default
             return prompt_payload
           
         handsome_prompt = "\n<protagonist_appearance>\n主角很帅。\n</protagonist_appearance>\n"  
