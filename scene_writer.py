@@ -330,45 +330,15 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
     if rewrite_guidance:
         prompt += f"\n\n[Quality Gate Rewrite — Previous attempt issues to fix]\n{rewrite_guidance}\n"
 
-    # Inject narrative diversity context (anti-homogenization, StoryScope 2026)
-    try:
-        from core.narrative_diversity import fingerprint_chapter, build_diversity_context
-        from utils.config import MANUSCRIPTS_DIR
-        # Load recent chapters for fingerprinting
-        recent_fps = []
-        for prev_ch in range(max(1, chapter_id - 5), chapter_id):
-            ch_path = Path(MANUSCRIPTS_DIR) / f"vol_{volume_id:02d}" / f"ch_{prev_ch:03d}_final.md"
-            if ch_path.exists():
-                try:
-                    ch_text = ch_path.read_text(encoding="utf-8")
-                    recent_fps.append(fingerprint_chapter(ch_text, prev_ch))
-                except Exception:
-                    pass
-        if recent_fps:
-            diversity_ctx = build_diversity_context(recent_fps)
-            if diversity_ctx:
-                prompt += diversity_ctx
-    except Exception as e:
-        logger.debug("Diversity context skipped: %s", e)
+    # Narrative diversity injection DISABLED — archetypes are unverified working hypotheses.
+    # Will re-enable after web-verifying archetype definitions against published taxonomy.
+    # See: core/narrative_diversity.py [待验证] markers.
 
-    # Inject storyform constraints (NCP v1.3.0 — structural narrative argument)
-    try:
-        from core.storyform import Storyform
-        from utils.config_loader import get_config
-        novel_name = get_config("workspace.novel_name", default="")
-        sf_path = Path(".novel") / f"{novel_name}" / "storyform.json" if novel_name else None
-        if not sf_path or not sf_path.exists():
-            sf_path = Path(".novel") / "storyform.json"
-        if sf_path.exists():
-            import json
-            sf_data = json.loads(sf_path.read_text(encoding="utf-8"))
-            sf = Storyform.from_dict(sf_data)
-            sf_context = sf.to_writing_context()
-            if sf_context:
-                prompt += sf_context
-                print(f"  [OK] Storyform (NCP) constraints injected")
-    except Exception as e:
-        logger.debug("Storyform injection skipped: %s", e)
+    # Storyform injection DISABLED — template problem/solution/concern assignments
+    # are not verified against official Dramatica storyforms.
+    # NCP v1.3.0 schema is valid, but our genre-specific mappings are unverified.
+    # Will re-enable after sourcing official Dramatica genre storyforms.
+    # See: core/storyform.py [待验证] markers.
 
     # Inject genre knowledge — slim: only this chapter's relevant hooks + mistakes
     try:
