@@ -39,9 +39,9 @@
     "novel_name": "test_xiuzhen"
   },
   "writing": {
-    "target_word_count": 2000,
-    "min_word_count": 1500,
-    "max_word_count": 2500,
+    "target_word_count": 3000,
+    "min_word_count": 2000,
+    "max_word_count": 3500,
     "history_chapters_count": 15,
     "previous_chapter_chars": 4000,
     "progress_chunk_size": 1000
