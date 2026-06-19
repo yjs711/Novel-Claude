@@ -268,6 +268,8 @@ textarea { resize: vertical; }
       <button id="modeDeep" onclick="switchMode('deep')">Deep</button>
     </div>
     <span class="sep"></span>
+    <select id="selModel" onchange="switchModel(this.value)" style="min-width:140px;font-size:12px"><option value="">加载模型中...</option></select>
+    <span class="sep"></span>
     <button class="btn-primary btn-sm" onclick="doGenerate()">生成</button>
     <button class="btn-secondary btn-sm" onclick="doPause()" id="btnPause" style="display:none">暂停</button>
     <button class="btn-secondary btn-sm" onclick="doRewrite()">AI改写</button>
@@ -553,7 +555,21 @@ textarea { resize: vertical; }
         <div class="output-box" id="flipOutput"></div>
       </div>
     </div>
-    <!-- Module 6: 质量仪表 -->
+    <!-- Module 6: 过审检测 -->
+    <div class="inspire-module">
+      <div class="inspire-header" onclick="toggleInspireModule(this)">
+        <span class="arrow">&#9660;</span> 过审检测
+      </div>
+      <div class="inspire-body">
+        <div class="btn-row" style="flex-wrap:wrap;gap:4px">
+          <button class="btn-primary btn-sm" onclick="runComplianceCheck()">全面检测</button>
+          <button class="btn-secondary btn-sm" onclick="runLexicalAudit()">仅词法</button>
+          <button class="btn-secondary btn-sm" onclick="runAIRepetitionCheck()">高频复用</button>
+        </div>
+        <div class="output-box" id="complianceOutput" style="margin-top:6px;max-height:300px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <!-- Module 7: 质量仪表 -->
     <div class="inspire-module">
       <div class="inspire-header" onclick="toggleInspireModule(this)">
         <span class="arrow">&#9660;</span> 质量仪表
@@ -1699,6 +1715,7 @@ document.addEventListener('keydown', function(e) {
 // ── Init ──
 (function init() {
   loadStoryEngine();
+  loadModels();
   loadStatus();
   loadChapterList();
   loadQualityGate();
@@ -1740,6 +1757,176 @@ document.addEventListener('keydown', function(e) {
 
   logMsg('就绪');
 })();
+
+// ── 模型管理 ──
+function loadModels() {
+  apiGet('/api/models').then(function(r) {
+    if (!r || !r.models) return;
+    var sel = el('selModel');
+    if (!sel) return;
+    sel.innerHTML = '';
+    var keys = Object.keys(r.models);
+    for (var i = 0; i < keys.length; i++) {
+      var m = r.models[keys[i]];
+      if (m.purpose === 'writing') {
+        var opt = document.createElement('option');
+        opt.value = keys[i];
+        opt.textContent = m.label || keys[i];
+        sel.appendChild(opt);
+      }
+    }
+    apiGet('/api/status').then(function(s) {
+      if (s && s.model) {
+        sel.value = s.model;
+      }
+    });
+  });
+}
+
+function switchModel(modelKey) {
+  apiPost('/api/models/switch', {model: modelKey}).then(function(r) {
+    if (r && r.ok) showToast('已切换至: ' + modelKey);
+  });
+}
+
+// ── 过审检测 ──
+function runLexicalAudit() {
+  var ta = el('editorTextarea');
+  if (!ta || !ta.value) { showToast('编辑器为空', true); return; }
+  var text = ta.value;
+  var out = el('complianceOutput');
+  if (!out) return;
+
+  var sentences = text.split(/[。！？\n]/).filter(Boolean);
+  var sentLens = sentences.map(function(s) { return s.length; });
+  var avg = sentLens.reduce(function(a, b) { return a + b; }, 0) / sentLens.length;
+  var variance = sentLens.reduce(function(a, b) { return a + (b - avg) * (b - avg); }, 0) / sentLens.length;
+  variance = Math.round(variance * 10) / 10;
+
+  var colons = (text.match(/[:：]/g) || []).length;
+  var totalChars = text.length;
+  var colonDensity = totalChars > 0 ? Math.round((colons / totalChars * 1000) * 10) / 10 : 0;
+
+  var dashes = (text.match(/——/g) || []).length;
+
+  var bannedWords = [
+    '值得注意的是','综上所述','不可否认','总而言之','毋庸置疑',
+    '嘴角微微上扬','倒吸一口凉气','此子恐怖如斯','心中不由得一震',
+    '不禁倒吸','顿时感到','幽幽地叹了一口气','仿佛整个世界都安静了',
+    '宛如一幅画卷','眼神中闪过一丝','嘴角勾起一抹',
+    '在这个","的时代','不仅是","更是","不言而喻',
+  ];
+  var bannedHits = [];
+  for (var bi = 0; bi < bannedWords.length; bi++) {
+    var reg = new RegExp(bannedWords[bi].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    var count = (text.match(reg) || []).length;
+    if (count > 0) bannedHits.push('    - "' + bannedWords[bi] + '" ' + count + '次' + (count >= 3 ? ' ⚠️' : ''));
+  }
+
+  var chengyuMatches = text.match(/[一-鿿]{4}[，。、；：！？\s]/g);
+  var chengyuCount = chengyuMatches ? chengyuMatches.length : 0;
+  var chengyuDensity = totalChars > 0 ? Math.round((chengyuCount / totalChars * 1000) * 10) / 10 : 0;
+
+  var fourCharWords = text.match(/[一-鿿]{4}/g);
+  var fourCharCount = fourCharWords ? fourCharWords.length : 0;
+  var fourCharRatio = totalChars > 0 ? Math.round(fourCharCount / totalChars * 100) : 0;
+
+  var warnings = [];
+  var okCount = 0;
+  var warnCount = 0;
+
+  if (variance < 8) { warnings.push('句长方差偏低 (' + variance + ', AI 典型 <8)'); warnCount++; }
+  else { okCount++; }
+  if (colonDensity > 5) { warnings.push('冒号密度偏高 (' + colonDensity + '/千字)'); warnCount++; }
+  else { okCount++; }
+  if (dashes > 3) { warnings.push('破折号过多 (' + dashes + '次, 建议 ≤3)'); warnCount++; }
+  else { okCount++; }
+  if (chengyuDensity > 3) { warnings.push('成语连用密度偏高 (' + chengyuDensity + '/千字)'); warnCount++; }
+  else { okCount++; }
+  if (fourCharRatio > 15) { warnings.push('四字词占比偏高 (' + fourCharRatio + '%)'); warnCount++; }
+  else { okCount++; }
+
+  var html = '<b>【词法审计】</b> 纯本地计算，瞬时完成<br>';
+  html += '<br>句长方差：' + variance + ' (人类参考 >12, AI 典型 <8)';
+  html += '<br>冒号密度：' + colonDensity + ' 个/千字 (人类参考 <2, AI 典型 >5)';
+  html += '<br>破折号：' + dashes + ' 次 (建议每章 ≤3)';
+  html += '<br>成语连用密度：' + chengyuDensity + ' 次/千字 (人类参考 <1.5, AI 典型 >3)';
+  html += '<br>四字词占比：' + fourCharRatio + '%';
+  html += '<br><br>禁用词命中：' + bannedHits.length + ' 次' + (bannedHits.length > 0 ? '<br>' + bannedHits.join('<br>') : '');
+  html += '<br><br><b>总结：</b>' + okCount + ' 项正常 / ' + warnCount + ' 项需关注';
+  if (warnings.length > 0) html += '<br>' + warnings.join('<br>');
+
+  out.innerHTML = html;
+}
+
+function runAIComplianceCheck() {
+  var text = el('editorTextarea') ? el('editorTextarea').value.substring(0, 2000) : '';
+  if (!text) { showToast('编辑器为空', true); return; }
+  var out = el('complianceOutput');
+  if (!out) return;
+  out.innerHTML += '<br><br><b>【AI 内容检测】</b><br>分析中...';
+  llamaStream([
+    {role: 'system', content: '你是网文平台审核助手。根据起点中文网和番茄小说的内容规范，对以下文本做5维检查：(1)政治敏感 (2)色情低俗 (3)暴力血腥 (4)AI味过浓 (5)未成年负面导向。每个维度输出PASS/WARN/FAIL，若有问题标注具体段落。格式简洁，用中文。最后注明"本检测仅供参考，不构成过审保证"。'},
+    {role: 'user', content: '请审核以下章节内容：\n' + text}
+  ], function(token) {
+    if (out.innerHTML.indexOf('分析中...') !== -1) {
+      out.innerHTML = out.innerHTML.replace('分析中...', '');
+    }
+    out.innerHTML += token;
+  }, function() { showToast('审核完成'); },
+  function(err) { showToast('审核失败: ' + err, true); });
+}
+
+function runAIRepetitionCheck() {
+  var out = el('complianceOutput');
+  if (!out) return;
+  var currentText = el('editorTextarea') ? el('editorTextarea').value : '';
+  if (!currentText) { showToast('编辑器为空', true); return; }
+  out.innerHTML = '<b>【高频复用检测】</b><br>扫描中...';
+
+  var aiPhrases = ['嘴角微微上扬','倒吸一口凉气','此子恐怖如斯','心中不由得一震','幽幽地叹了一口气','眼神中闪过一丝','嘴角勾起一抹','仿佛整个世界都安静了','宛如一幅画卷','百感交集','五味杂陈','缓缓地抬起头','微微皱眉','不由得一愣','心中一惊','脸色一变','倒抽一口冷气','不由得倒吸','整个人','这一刻'];
+
+  var lines = [];
+  for (var i = 0; i < aiPhrases.length; i++) {
+    var count = (currentText.match(new RegExp(aiPhrases[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+    if (count >= 2) lines.push('&#9888; 本章: "' + aiPhrases[i] + '" 出现 ' + count + ' 次');
+  }
+
+  var paras = currentText.split('\n').filter(function(p) { return p.trim().length > 20; });
+  var dupes = 0;
+  for (var j = 0; j < paras.length; j++) {
+    for (var k = j + 1; k < paras.length; k++) {
+      var shorter = paras[j].length < paras[k].length ? paras[j] : paras[k];
+      var longer = paras[j].length < paras[k].length ? paras[k] : paras[j];
+      if (shorter.length < 30) continue;
+      var set1 = {}; for (var ci = 0; ci < shorter.length; ci++) set1[shorter[ci]] = 1;
+      var intersect = 0; for (var ck = 0; ck < longer.length; ck++) if (set1[longer[ck]]) intersect++;
+      var dice = 2 * intersect / (shorter.length + longer.length);
+      if (dice > 0.7) dupes++;
+    }
+  }
+
+  lines.push('');
+  lines.push('重复段落检测(字符Dice>0.7): ' + dupes + ' 对');
+  if (dupes > 0) lines.push('&#9888; 存在高相似度段落，建议修改');
+
+  if (lines.length === 1) lines.push('&#9989; 未发现高频复用问题');
+
+  out.innerHTML += '<br>' + lines.join('<br>');
+}
+
+function runComplianceCheck() {
+  var out = el('complianceOutput');
+  if (!out) return;
+  // 先跑词法审计（同步），保存结果
+  runLexicalAudit();
+  var lexHtml = out.innerHTML;
+  // 再跑高频复用（同步），合并显示
+  runAIRepetitionCheck();
+  out.innerHTML = lexHtml + '<hr>' + out.innerHTML;
+  // 最后跑AI检测（异步，追加到合并结果后）
+  runAIComplianceCheck();
+}
 </script>
 </body>
 </html>
