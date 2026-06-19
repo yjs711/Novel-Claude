@@ -196,7 +196,102 @@ TEMPLATE_STARWARS = Storyform(
                            driver="Action", limit="Optionlock"),
 )
 
+# ── 观察性模板（中国网文，非官方Dramatica）─────────────────────────────
+# 来源: 中国作家网学术分析(2024)、B站拆书系列、万订作者白蘸糖框架、
+#   oh-story-claudecode拆文库、NGA/知乎社区分析
+# 标注[观察分析]: 基于作品结构反推，非Dramatica官方认证
+
+TEMPLATE_FANREN = Storyform(
+    title="凡人流·利己主义逆袭 (凡人修仙传模式)",
+    genre="修仙",
+    central_inequity="在一个资源有限、弱肉强食的修仙世界里，没有天赋的底层少年如何突破阶层天花板。",
+    thematic_argument="在丛林法则的世界里，生存高于道德，自我保全是一切的前提。",
+    objective_story=Throughline(
+        domain="Physics", concern="Obtaining",
+        problem="Pursuit", solution="Avoid",
+        description="资源获取的永恒竞赛。炼气→筑基→结丹→元婴，每级对应明确的社会地位和生存资源。OS(Physics)↔RS(Psychology)。",
+    ),
+    main_character=Throughline(
+        domain="Universe", concern="Future",
+        problem="Control", solution="Uncontrolled",
+        description="韩立: 底层伪灵根少年→自我驱动的功绩主体→精致的利己主义者。'打不过就跑，活着才有输出。' MC(Universe)↔IC(Mind)。",
+    ),
+    influence_character=Throughline(
+        domain="Mind", concern="Subconscious",
+        problem="Avoid", solution="Pursuit",
+        description="修仙世界的丛林法则本身: 不进阶即陨落。这个无处不在的生存压力是真正的'影响角色'。",
+    ),
+    relationship_story=Throughline(
+        domain="Psychology", concern="Becoming",
+        problem="Reconsider", solution="Consider",
+        description="韩立与修仙体系的关系: 若即若离的散修，既依附体系获取资源，又保持距离避免被体系吞噬。",
+    ),
+    dynamics=StoryDynamics(resolve="Steadfast", outcome="Success", judgement="Good",
+                           driver="Action", limit="Optionlock"),
+)
+
+TEMPLATE_GUIMI = Storyform(
+    title="克苏鲁·扮演法救赎 (诡秘之主模式)",
+    genre="悬疑",
+    central_inequity="在一个被邪神注视的世界里，凡人如何在疯狂与力量之间找到平衡，守护文明的最后光辉。",
+    thematic_argument="真正的强大不是掌握力量，而是在力量面前保持人性。扮演法不是伪装，是防止被力量异化的最后防线。",
+    objective_story=Throughline(
+        domain="Mind", concern="Subconscious",
+        problem="Pursuit", solution="Avoid",
+        description="非凡特性序列体系的争夺。22条途径×10序列=完整的'升级+疯狂'双轨。OS(Mind)↔RS(Universe)。",
+    ),
+    main_character=Throughline(
+        domain="Psychology", concern="Becoming",
+        problem="Reconsider", solution="Consider",
+        description="克莱恩: 现代人穿越→愚者身份的扮演者→塔罗会的创始人。'记住，你只是在扮演。' MC(Psychology)↔IC(Physics)。",
+    ),
+    influence_character=Throughline(
+        domain="Physics", concern="Doing",
+        problem="Avoid", solution="Pursuit",
+        description="罗塞尔大帝的日记和遗物: 一个穿越前辈的完整堕落轨迹，用行动(而非说教)警示克莱恩。",
+    ),
+    relationship_story=Throughline(
+        domain="Universe", concern="Future",
+        problem="Control", solution="Uncontrolled",
+        description="塔罗会: 克莱恩与成员们因末日的共同命运而联结。RS(Universe)↔OS(Mind)动态对。",
+    ),
+    dynamics=StoryDynamics(resolve="Change", outcome="Success", judgement="Bad",
+                           driver="Decision", limit="Timelock"),
+)
+
+TEMPLATE_DAGENG = Storyform(
+    title="打更人·案件驱动升级 (大奉打更人模式)",
+    genre="都市",
+    central_inequity="穿越成古代打更人，用现代刑侦思维在一个有妖有仙的世界里破案求生，同时卷入朝堂与江湖的双重漩涡。",
+    thematic_argument="权力的本质不是武力高低，而是信息差。知道的比别人多，就比别人强。",
+    objective_story=Throughline(
+        domain="Physics", concern="Doing",
+        problem="Pursuit", solution="Avoid",
+        description="案件驱动的主线: 每一个案件揭开一层更大的阴谋。OS(Physics)↔RS(Psychology)。",
+    ),
+    main_character=Throughline(
+        domain="Universe", concern="Future",
+        problem="Control", solution="Uncontrolled",
+        description="许七安: 穿越警察→铜锣→银锣→金锣。现代思维vs古代规则的持续碰撞。MC(Universe)↔IC(Mind)。",
+    ),
+    influence_character=Throughline(
+        domain="Mind", concern="Subconscious",
+        problem="Avoid", solution="Pursuit",
+        description="大奉官场的规则与潜规则: 一个固化但可被现代思维突破的观念体系。",
+    ),
+    relationship_story=Throughline(
+        domain="Psychology", concern="Becoming",
+        problem="Reconsider", solution="Consider",
+        description="许七安与同僚/上级/线人的关系网: 因案件而聚合，因利益而分化。RS(Psychology)↔OS(Physics)。",
+    ),
+    dynamics=StoryDynamics(resolve="Steadfast", outcome="Success", judgement="Good",
+                           driver="Action", limit="Optionlock"),
+)
+
 STORYFORM_TEMPLATES = {
     "revenge": TEMPLATE_HAMLET,
     "rise_to_power": TEMPLATE_STARWARS,
+    "fanren": TEMPLATE_FANREN,
+    "guimi": TEMPLATE_GUIMI,
+    "dageng": TEMPLATE_DAGENG,
 }
