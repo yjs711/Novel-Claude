@@ -12,17 +12,14 @@
     ],
     "alt_models": {
       "qwen3.6-35b-opus-reasoning": {
-        "base_url": "http://localhost:58909/v1",
         "purpose": "planning",
         "label_hint": "Opus 35B — 大纲/世界观/力量体系/角色设定"
       },
       "qwen3.6-27b-uncensored": {
-        "base_url": "http://localhost:58912/v1",
         "purpose": "writing",
         "label_hint": "Huihui 27B MTP — 精品章节执笔"
       },
       "qwen3.6-27b-ud": {
-        "base_url": "http://localhost:58915/v1",
         "purpose": "writing",
         "label_hint": "27B UD-Q8_K_XL MTP — 高质量正文/润色"
       }

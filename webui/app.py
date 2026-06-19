@@ -153,7 +153,17 @@ async def index():
 
 @app.get("/api/config")
 async def get_config():
-    return load_cfg()
+    cfg = load_cfg()
+    # Frontend expects genres/styles arrays for settings dropdowns
+    try:
+        from skills.gen_genre_tags.skill import GENRE_DB
+        cfg["genres"] = list(GENRE_DB.keys())
+    except Exception: cfg["genres"] = ["修仙"]
+    try:
+        from skills.gen_writing_style.skill import STYLE_DB
+        cfg["styles"] = list(STYLE_DB.keys())
+    except Exception: cfg["styles"] = ["网文爽文"]
+    return cfg
 
 @app.post("/api/config")
 async def update_config(request: Request):
@@ -248,7 +258,24 @@ async def status():
     except Exception:
         pass
 
-    # Storyform status
+    # Story engine status (题材×风格匹配)
+    try:
+        from core.story_engine import match_storyform
+        genre = cfg.get("genre", "")
+        style = cfg.get("style", "")
+        if genre or style:
+            matched = match_storyform(genre, style)
+            result["story_engine"] = {
+                "genre": genre,
+                "style": style,
+                "genre_found": matched["genre_found"],
+                "style_found": matched["style_found"],
+                "constraint_count": len(matched["constraints"]),
+            }
+    except Exception:
+        result["story_engine"] = {"available": False}
+
+    # Legacy storyform status
     try:
         sf_path = sp.parent / "storyform.json" if sp.exists() else Path(".novel/storyform.json")
         result["storyform"] = {"loaded": sf_path.exists()}
@@ -421,7 +448,8 @@ async def write_stream(request: Request):
                 wf = WfMoShenWorkflowSkill(ctx)
                 wf._config = cfg
                 wf.current_mode = wf_mode
-                pipeline_result = wf.run_agent_pipeline(outline, chapter)
+                loop = asyncio.get_event_loop()
+                pipeline_result = await loop.run_in_executor(None, wf.run_agent_pipeline, outline, chapter)
 
                 full_content = pipeline_result["final_text"]
                 gatekeeper = pipeline_result["gatekeeper_score"]
@@ -459,31 +487,70 @@ async def write_stream(request: Request):
 
             from utils.prompt_loader import writing_prompt
             system_prompt = writing_prompt() + _build_genre_style_injection(cfg)
-            full_content = ""
-            stream = client.chat.completions.create(
-                model=model,
-                temperature=temp,
-                frequency_penalty=freq_pen,
-                presence_penalty=pres_pen,
-                top_p=top_p,
-                max_tokens=8192,
-                stream=True,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-            )
-            for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    text = chunk.choices[0].delta.content
-                    full_content += text
-                    yield "data: " + _json.dumps({"type": "stream", "text": text}, ensure_ascii=False) + "\n\n"
+            # 用 Queue 在线程和事件循环之间传递 token
+            token_queue: asyncio.Queue = asyncio.Queue()
 
-            # Post-processing (hooks + quality gate) — shared pipeline
+            def sync_stream():
+                """在线程中运行同步流式调用"""
+                try:
+                    stream = client.chat.completions.create(
+                        model=model, temperature=temp,
+                        frequency_penalty=freq_pen, presence_penalty=pres_pen,
+                        top_p=top_p, max_tokens=8192, stream=True,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": prompt}
+                        ],
+                        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+                        timeout=300,  # 5分钟超时
+                    )
+                    for chunk in stream:
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            token_queue.put_nowait(("token", chunk.choices[0].delta.content))
+                    token_queue.put_nowait(("done", None))
+                except Exception as e:
+                    token_queue.put_nowait(("error", str(e)))
+
+            # 在线程池中运行
+            loop = asyncio.get_event_loop()
+            future = loop.run_in_executor(None, sync_stream)
+
+            # 从主事件循环消费 token
+            timeout_seconds = 360  # 6分钟总超时
+            deadline = asyncio.get_event_loop().time() + timeout_seconds
+            full_content = ""
+
+            try:
+                while True:
+                    remaining = deadline - asyncio.get_event_loop().time()
+                    if remaining <= 0:
+                        yield "data: " + _json.dumps({"type": "error", "msg": "生成超时（6分钟）"}, ensure_ascii=False) + "\n\n"
+                        break
+                    try:
+                        kind, value = await asyncio.wait_for(token_queue.get(), timeout=min(remaining, 30))
+                    except asyncio.TimeoutError:
+                        # 30秒没新 token，检查是否完成
+                        if future.done():
+                            break
+                        continue
+                    if kind == "token":
+                        full_content += value
+                        yield "data: " + _json.dumps({"type": "stream", "text": value}, ensure_ascii=False) + "\n\n"
+                    elif kind == "done":
+                        break
+                    elif kind == "error":
+                        yield "data: " + _json.dumps({"type": "error", "msg": value}, ensure_ascii=False) + "\n\n"
+                        return
+            except Exception as e:
+                yield "data: " + _json.dumps({"type": "error", "msg": f"生成异常: {str(e)}"}, ensure_ascii=False) + "\n\n"
+                return
+
+            # Post-processing
             if full_content:
-                from scene_writer import post_process_chapter
-                ch_file, gate_verdict, _ = post_process_chapter(volume, chapter, full_content)
+                def sync_post():
+                    from scene_writer import post_process_chapter
+                    return post_process_chapter(volume, chapter, full_content)
+                ch_file, gate_verdict, _ = await asyncio.to_thread(sync_post)
                 yield "data: " + _json.dumps({
                     "type": "done", "chapter": chapter, "words": len(full_content),
                     "path": str(ch_file), "gate_verdict": gate_verdict or "none",
@@ -1781,6 +1848,56 @@ async def save_storyform(request: Request):
     sf_path.write_text(sf.to_json(), encoding="utf-8")
     log_step("Storyform saved", template=data.get("template", "custom"), title=sf.title)
     return {"ok": True, "storyform": sf.to_dict()}
+
+
+# ── story engine (题材×风格 自动匹配) ──────────────────────────────────────
+
+@app.get("/api/story-engine")
+async def get_story_engine():
+    """Get story engine constraints for current genre × style combo."""
+    from core.story_engine import (
+        build_writing_context, match_storyform,
+        list_genres, list_styles, GENRE_ENGINES, STYLE_MODES,
+    )
+    cfg = load_cfg()
+    genre = cfg.get("genre", "")
+    style = cfg.get("style", "")
+
+    result = {
+        "genres": list_genres(),
+        "styles": list_styles(),
+        "current_genre": genre,
+        "current_style": style,
+        "matched": None,
+        "constraints_text": "",
+    }
+
+    if genre or style:
+        matched = match_storyform(genre, style)
+        result["matched"] = {
+            "genre_found": matched["genre_found"],
+            "style_found": matched["style_found"],
+            "constraints": matched["constraints"],
+        }
+        result["constraints_text"] = build_writing_context(genre, style)
+
+    # Also expose engine metadata for UI display
+    if genre and genre in GENRE_ENGINES:
+        ge = GENRE_ENGINES[genre]
+        result["genre_meta"] = {
+            "upgrade_chain": ge.upgrade_chain,
+            "core_appeal": ge.core_appeal,
+            "pace_reference": ge.pace_reference,
+        }
+    if style and style in STYLE_MODES:
+        sm = STYLE_MODES[style]
+        result["style_meta"] = {
+            "emotion_curve": sm.emotion_curve,
+            "pacing_rule": sm.pacing_rule,
+            "dialogue_ratio": sm.dialogue_ratio,
+        }
+
+    return result
 
 
 # ── export ────────────────────────────────────────────────────────────────────

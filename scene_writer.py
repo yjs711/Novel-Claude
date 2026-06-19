@@ -276,7 +276,22 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
         "【要求】承接前章情绪，本章至少有一个爽点/钩子。约3000字。直接输出正文。\n"
     )
 
-    return "\n".join(prompt_parts)
+    prompt = "\n".join(prompt_parts)
+
+    # Inject story engine constraints (题材×风格 — 27B可执行的实战约束)
+    try:
+        from core.story_engine import build_writing_context
+        from utils.config_loader import get_config
+        genre = get_config("genre", default="")
+        style = get_config("style", default="")
+        if genre or style:
+            engine_ctx = build_writing_context(genre, style)
+            if engine_ctx:
+                prompt += engine_ctx
+    except Exception:
+        pass  # 引擎注入失败不影响生成
+
+    return prompt
 
 
 def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None,
@@ -334,7 +349,21 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
     # Will re-enable after web-verifying archetype definitions against published taxonomy.
     # See: core/narrative_diversity.py [待验证] markers.
 
-    # Inject storyform constraints (verified Dramatica examples: Hamlet + Star Wars)
+    # Inject story engine constraints (题材×风格 — 27B可执行的实战约束)
+    try:
+        from core.story_engine import build_writing_context
+        from utils.config_loader import get_config
+        genre = get_config("genre", default="")
+        style = get_config("style", default="")
+        if genre or style:
+            engine_ctx = build_writing_context(genre, style)
+            if engine_ctx:
+                prompt += engine_ctx
+                logger.debug("Story engine injected: %s x %s", genre, style)
+    except Exception as e:
+        logger.debug("Story engine injection skipped: %s", e)
+
+    # Inject legacy storyform constraints (fallback — 手动选择的 Dramatica 模板)
     try:
         from core.storyform import Storyform
         from utils.config_loader import get_config
@@ -348,7 +377,7 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
             sf = Storyform.from_dict(sf_data)
             sf_context = sf.to_writing_context()
             if sf_context:
-                prompt += sf_context
+                prompt += "\n" + sf_context
     except Exception as e:
         logger.debug("Storyform injection skipped: %s", e)
 
