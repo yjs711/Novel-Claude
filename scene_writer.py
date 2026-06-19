@@ -257,10 +257,10 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
             detail_parts.append(f"章末钩子: {structured_outline['ending_hook']}")
         if structured_outline.get("scenes_text") or structured_outline.get("scenes"):
             scenes = structured_outline.get("scenes_text") or "\n".join(
-                f"- {s.get('name','')}: 目标={s.get('goal','')} | 冲突={s.get('conflict','')} | POV={s.get('pov','主角')}"
+                f"- {s.get('name','')}: POV={s.get('pov','主角')} | 目标={s.get('goal','')} | 冲突={s.get('conflict','')} | 字数≈{s.get('word_target','?')}字"
                 for s in (structured_outline.get("scenes", []) if isinstance(structured_outline.get("scenes"), list) else [])
             )
-            detail_parts.append(f"场景分解:\n{scenes}")
+            detail_parts.append(f"场景分解 (POV锁死，禁止透视配角内心):\n{scenes}")
         if detail_parts:
             prompt_parts.append("【细纲 — 本章执行指南（AI模型：越详细输出越精准）】\n" + "\n".join(detail_parts) + "\n")
     else:
