@@ -92,7 +92,7 @@ for fn in sorted(os.listdir(base)):
 
 # 6. Config
 print('=== 6. Config ===')
-cfg_path = r'C:\Users\abee\ai-novel-frameworks\Novel-Claude\config.json'
+cfg_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
 cfg = json.load(open(cfg_path, encoding='utf-8'))
 gen = cfg.get('generation', {})
 check('temperature_writing', 'temperature_writing' in gen)
@@ -102,15 +102,14 @@ check('task_models.planning', 'planning' in cfg.get('llm', {}).get('task_models'
 
 # 7. WebUI HTML
 print('=== 7. WebUI HTML ===')
-html_path = r'C:\Users\abee\ai-novel-frameworks\Novel-Claude\webui\templates\index.html'
+html_path = os.path.join(os.path.dirname(__file__), '..', 'webui', 'templates', 'index.html')
 html = open(html_path, encoding='utf-8').read()
 check('agent_progress handler', 'agent_progress' in html)
 check('agent_result handler', 'agent_result' in html)
-check('agent mode checkbox', 'agentMode' in html)
-check('mode=agent URL', 'mode=agent' in html)
-check('L3-L6 detail table', '六层检测详情' in html)  # 六层检测详情
-check('status: plan model', '策划模型' in html)  # 策划模型
-check('status: workflow mode', '工作流模式' in html)  # 工作流模式
+check('dashboard present', 'dashboard' in html)
+check('sidebar layout', 'sidebar' in html and 'right-panel' in html)
+check('settings panel', 'cfgGenre' in html and 'cfgMode' in html)
+check('streaming support', 'write-stream' in html)
 
 # Summary
 print()
