@@ -5,429 +5,1595 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Novel-Claude · 写作工作室</title>
 <style>
-  :root {
-    --bg: #f8f9fa; --surface: #ffffff; --surface2: #f1f3f5; --border: #e9ecef;
-    --text: #212529; --text2: #868e96; --text3: #adb5bd;
-    --primary: #4263eb; --primary-hover: #3b5bdb; --primary-light: #edf2ff;
-    --success: #2b8a3e; --success-light: #ebfbee;
-    --warning: #e67700; --warning-light: #fff9db;
-    --danger: #c92a2a; --danger-light: #fff5f5;
-    --accent: #be4bdb;
-    --radius: 8px; --radius-sm: 6px;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-    --shadow: 0 1px 3px rgba(0,0,0,0.06);
-    --sidebar: 180px; --right-panel: 260px;
-    --font-sans: -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
-    --font-serif: "Noto Serif SC",Georgia,serif;
-    --font-mono: "JetBrains Mono","Fira Code",monospace;
-    --editor-width: 860px;
-  }
-  * { box-sizing:border-box;margin:0;padding:0 }
-  body { font-family:var(--font-sans);background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden }
-  button { cursor:pointer;font-family:inherit;border:none;border-radius:var(--radius-sm);padding:6px 14px;font-size:13px;transition:.15s }
-  .btn-primary { background:var(--primary);color:#fff } .btn-primary:hover { background:var(--primary-hover) }
-  .btn-secondary { background:var(--surface2);color:var(--text) } .btn-secondary:hover { background:var(--border) }
-  .btn-danger { background:var(--danger);color:#fff } .btn-sm { padding:4px 10px;font-size:12px }
-  .btn-block { width:100%;margin-bottom:4px }
-  input,select,textarea { font-family:inherit;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:13px;outline:none }
-  input:focus,select:focus,textarea:focus { border-color:var(--primary) }
-  .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600 }
-  .bg-ok { background:var(--success-light);color:var(--success) }
-  .bg-warn { background:var(--warning-light);color:var(--warning) }
-  .bg-err { background:var(--danger-light);color:var(--danger) }
-  ::-webkit-scrollbar { width:5px } ::-webkit-scrollbar-thumb { background:var(--text3);border-radius:3px }
-  .layout { display:flex;width:100%;height:100% }
-  .sidebar { width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0 }
-  .sidebar-header { padding:14px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px }
-  .sidebar-header .dot { width:7px;height:7px;border-radius:50%;background:var(--success) }
-  .sidebar-nav { flex:1;overflow-y:auto;padding:6px }
-  .sidebar-nav button { display:block;width:100%;text-align:left;padding:7px 12px;margin-bottom:1px;background:transparent;border-radius:var(--radius-sm);font-size:12px;color:var(--text2) }
-  .sidebar-nav button:hover,.sidebar-nav button.active { background:var(--primary-light);color:var(--primary) }
-  .sidebar-footer { padding:10px 12px;border-top:1px solid var(--border);font-size:10px;color:var(--text3) }
-  .main { flex:1;display:flex;flex-direction:column;overflow:hidden }
-  .toolbar { padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:13px }
-  .toolbar select { width:80px;padding:5px 8px } .toolbar input[type=number] { width:60px;padding:5px 8px }
-  .toolbar .sep { width:1px;height:20px;background:var(--border);margin:0 4px }
-  .content { flex:1;display:flex;overflow:hidden }
-  .panel { flex:1;overflow-y:auto;padding:24px 32px }
-  .panel-write { display:flex;justify-content:center;padding:40px 60px }
-  .panel-write .inner { max-width:var(--editor-width);width:100% }
-  .panel-write .output { font-family:var(--font-serif);font-size:17px;line-height:2;padding:32px 50px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);white-space:pre-wrap;min-height:500px;box-shadow:var(--shadow-sm) }
-  .panel-write .status-bar { display:flex;gap:16px;margin-top:12px;font-size:13px;color:var(--text2) }
-  .panel-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px }
-  .card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm) }
-  .card h4 { font-size:12px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600 }
-  .card .val { font-size:28px;font-weight:700;color:var(--text) }
-  .card.wide { grid-column:span 2 }
-  h3 { font-size:18px;font-weight:700;margin-bottom:16px;color:var(--text) }
-  .card table { width:100%;font-size:12px;border-collapse:collapse }
-  .card table td,.card table th { padding:4px 6px;border-bottom:1px solid var(--surface2);text-align:left }
-  .card table th { color:var(--text2);font-weight:500 }
-  .right-panel { width:var(--right-panel);background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;font-size:12px }
-  .right-panel section { padding:12px;border-bottom:1px solid var(--border) }
-  .right-panel h4 { font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px }
-  .rp-row { display:flex;justify-content:space-between;padding:3px 0 }
-  .rp-log { max-height:180px;overflow-y:auto;font-family:var(--font-mono);font-size:10px;color:var(--text2) }
-  .rp-log div { padding:2px 0;border-bottom:1px solid var(--surface2) }
-  .tab-hidden { display:none }
-  .toast { position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;z-index:999;animation:slideUp .3s }
-  @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-  .toast-ok { background:var(--success-light);color:var(--success) }
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --border: #e8e8ec;
+  --text: #1d1d1f;
+  --text2: #86868b;
+  --text3: #c7c7cc;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-light: #e8f0fe;
+  --success: #34c759;
+  --success-light: #e8f8ee;
+  --danger: #ff3b30;
+  --danger-light: #ffeeed;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --serif: Georgia, "Noto Serif SC", serif;
+  --mono: "SF Mono", "Fira Code", monospace;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --panel-left: 260px;
+  --panel-right: 280px;
+  --transition: 0.2s;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+button { cursor: pointer; font-family: inherit; border: none; border-radius: var(--radius-sm); padding: 6px 14px; font-size: 13px; transition: var(--transition); }
+input, select, textarea { font-family: inherit; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 13px; outline: none; background: var(--surface); color: var(--text); }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+textarea { resize: vertical; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
 
-.focus-mode .sidebar { display:none !important }
-.focus-mode .right-panel { display:none !important }
-.focus-mode .panel-write { padding:60px 120px !important }
-.focus-mode .panel-write .inner { max-width:800px !important }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-sm { padding: 3px 10px; font-size: 12px; }
+.btn-xs { padding: 2px 8px; font-size: 11px; }
+.btn-block { width: 100%; margin-bottom: 4px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.bg-ok { background: var(--success-light); color: var(--success); }
+.bg-warn { background: #fff3cd; color: #856404; }
+.bg-err { background: var(--danger-light); color: var(--danger); }
+
+/* Layout */
+.layout { display: flex; width: 100%; height: 100vh; }
+.panel { display: flex; flex-direction: column; background: var(--surface); transition: var(--transition); }
+.panel-header { display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 8px; }
+.panel-header-title { font-size: 12px; font-weight: 700; color: var(--text2); letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel-toggle { margin-left: auto; background: none; border: none; color: var(--text3); padding: 2px 6px; font-size: 14px; cursor: pointer; transition: var(--transition); }
+.panel-toggle:hover { color: var(--text); }
+.panel-body { flex: 1; overflow-y: auto; }
+
+/* Left panel */
+.panel-left { width: var(--panel-left); border-right: 1px solid var(--border); flex-shrink: 0; }
+.panel-left.collapsed { width: 42px; }
+.panel-left.collapsed .panel-body { display: none; }
+.panel-left.collapsed .panel-header-title { writing-mode: vertical-lr; font-size: 11px; padding: 4px 0; }
+.panel-left.collapsed .panel-toggle { display: none; }
+
+/* Write panel */
+.panel-write { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* Right panels */
+.panel-right { width: var(--panel-right); border-left: 1px solid var(--border); flex-shrink: 0; }
+.panel-right.collapsed { width: 42px; }
+.panel-right.collapsed .panel-body { display: none; }
+.panel-right.collapsed .panel-header-title { writing-mode: vertical-lr; font-size: 11px; padding: 4px 0; }
+.panel-right.collapsed .panel-toggle { display: none; }
+
+/* Toolbar */
+.toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; font-size: 13px; }
+.toolbar select { width: 85px; padding: 4px 8px; font-size: 12px; }
+.toolbar input[type=number] { width: 55px; padding: 4px 8px; font-size: 12px; }
+.toolbar input[type=text] { width: 120px; padding: 4px 8px; font-size: 12px; }
+.toolbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+.toolbar .mode-group { display: flex; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); }
+.toolbar .mode-group button { border-radius: 0; border: none; padding: 4px 12px; font-size: 12px; background: var(--surface); color: var(--text2); }
+.toolbar .mode-group button.active { background: var(--accent); color: #fff; }
+.toolbar .mode-group button:not(:last-child) { border-right: 1px solid var(--border); }
+
+/* Editor */
+.editor-wrap { flex: 1; display: flex; justify-content: center; padding: 20px 24px; overflow-y: auto; }
+.editor-inner { max-width: 820px; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.editor-textarea { width: 100%; min-height: 500px; font-family: var(--serif); font-size: 18px; line-height: 2; padding: 28px 36px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); outline: none; resize: vertical; color: var(--text); box-shadow: var(--shadow-sm); }
+.editor-textarea:focus { border-color: var(--accent); }
+.editor-status { display: flex; gap: 16px; font-size: 12px; color: var(--text2); flex-wrap: wrap; }
+
+/* Left panel sections */
+.left-section { border-bottom: 1px solid var(--border); }
+.left-section-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; }
+.left-section-header:hover { background: var(--bg); }
+.left-section-body { padding: 4px 10px 10px; }
+.chapter-item { padding: 6px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; display: flex; justify-content: space-between; align-items: center; transition: var(--transition); }
+.chapter-item:hover { background: var(--accent-light); }
+.chapter-item .ch-num { color: var(--text2); min-width: 30px; }
+.chapter-item .ch-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 6px; }
+.chapter-item .ch-words { color: var(--text3); font-size: 11px; }
+.vol-header { padding: 4px 10px 2px; font-size: 11px; font-weight: 700; color: var(--text3); margin-top: 4px; }
+
+/* Wizard overlay */
+.wizard-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.35); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.wizard-card { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); max-width: 720px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+.wizard-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+.wizard-steps { display: flex; gap: 4px; flex: 1; }
+.wiz-step-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; background: var(--bg); color: var(--text3); transition: var(--transition); }
+.wiz-step-dot.active { background: var(--accent); color: #fff; }
+.wiz-step-dot.done { background: var(--success); color: #fff; }
+.wizard-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.wizard-step { display: none; }
+.wizard-step.active { display: block; }
+.wizard-footer { padding: 12px 24px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.wizard-footer .spacer { flex: 1; }
+.wizard-ai-discuss { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.wizard-ai-discuss .ai-header { padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; display: flex; align-items: center; gap: 6px; background: var(--bg); }
+.wizard-ai-discuss .ai-body { padding: 8px; display: none; }
+.wizard-ai-discuss .ai-body.open { display: block; }
+.wiz-chat-msgs { max-height: 200px; overflow-y: auto; margin-bottom: 8px; }
+.wiz-chat-msg { padding: 4px 8px; margin: 2px 0; border-radius: var(--radius-sm); font-size: 12px; }
+.wiz-chat-msg.user { background: var(--accent-light); text-align: right; }
+.wiz-chat-msg.ai { background: var(--bg); }
+.wiz-chat-input { display: flex; gap: 6px; }
+.wiz-chat-input input { flex: 1; padding: 4px 8px; font-size: 12px; }
+
+/* Wizard fields */
+.wiz-field { margin-bottom: 12px; }
+.wiz-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 4px; }
+.wiz-field input, .wiz-field select, .wiz-field textarea { width: 100%; }
+.wiz-field textarea { min-height: 60px; font-size: 13px; }
+.wiz-field [contenteditable] { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; min-height: 80px; font-size: 13px; line-height: 1.6; outline: none; }
+.wiz-field [contenteditable]:focus { border-color: var(--accent); }
+
+/* Outline panel tabs */
+.tab-bar { display: flex; border-bottom: 1px solid var(--border); }
+.tab-bar button { flex: 1; padding: 6px 0; font-size: 12px; background: none; color: var(--text2); border: none; border-bottom: 2px solid transparent; transition: var(--transition); }
+.tab-bar button.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; flex: 1; flex-direction: column; }
+.tab-content.active { display: flex; }
+.tab-content textarea { width: 100%; min-height: 200px; font-size: 12px; font-family: var(--mono); border: none; border-radius: 0; padding: 10px 14px; resize: vertical; }
+.tab-content .tab-actions { padding: 8px 14px; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Inspire modules */
+.inspire-module { border-bottom: 1px solid var(--border); }
+.inspire-header { padding: 8px 14px; font-size: 11px; font-weight: 700; color: var(--text2); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: var(--transition); }
+.inspire-header:hover { background: var(--bg); }
+.inspire-header .arrow { transition: var(--transition); font-size: 10px; }
+.inspire-header.collapsed .arrow { transform: rotate(-90deg); }
+.inspire-body { padding: 8px 14px; }
+.inspire-body.collapsed { display: none; }
+.inspire-body textarea { width: 100%; min-height: 50px; font-size: 12px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); resize: vertical; }
+.inspire-body .btn-row { display: flex; gap: 4px; margin-top: 6px; }
+.inspire-body .output-box { font-size: 12px; line-height: 1.6; padding: 6px 8px; margin-top: 6px; background: var(--bg); border-radius: var(--radius-sm); min-height: 30px; white-space: pre-wrap; }
+
+/* Chat (inspire) */
+.chat-messages { max-height: 250px; overflow-y: auto; margin-bottom: 8px; }
+.chat-msg { padding: 6px 10px; margin: 3px 0; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+.chat-msg.user { background: var(--accent-light); text-align: right; }
+.chat-msg.ai { background: var(--bg); }
+.chat-input-row { display: flex; gap: 6px; padding: 8px 0; }
+.chat-input-row input { flex: 1; padding: 6px 10px; font-size: 12px; }
+
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.35); z-index: 99; display: flex; align-items: center; justify-content: center; }
+.modal-card { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); padding: 20px 24px; max-width: 400px; width: 90%; }
+.modal-card h3 { font-size: 16px; margin-bottom: 12px; }
+.modal-card .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* Toast */
+.toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+.toast { padding: 10px 18px; border-radius: var(--radius-sm); font-size: 13px; box-shadow: var(--shadow); animation: slideUp 0.3s ease; max-width: 360px; }
+.toast.ok { background: var(--success-light); color: var(--success); border: 1px solid var(--success); }
+.toast.err { background: var(--danger-light); color: var(--danger); border: 1px solid var(--danger); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Foreshadowing stats */
+.fs-stats { display: flex; gap: 8px; font-size: 12px; color: var(--text2); padding: 4px 14px; }
+.fs-stats span { flex: 1; text-align: center; }
+.fs-stats .num { display: block; font-size: 18px; font-weight: 700; color: var(--text); }
+
+/* Gate score display */
+.gate-display { padding: 6px 14px; font-size: 12px; }
+.gate-display .score { font-size: 24px; font-weight: 700; }
+.gate-display .detail { color: var(--text2); font-size: 11px; }
+
+/* Focus mode */
+.focus-mode .panel-left { display: none; }
+.focus-mode .panel-right { display: none; }
+.focus-mode .editor-wrap { padding: 40px 80px; }
+.focus-mode .editor-inner { max-width: 720px; }
+
+/* Utility */
+.hidden { display: none !important; }
+.flex-1 { flex: 1; }
+.text-right { text-align: right; }
+.mt-4 { margin-top: 4px; }
+.mt-8 { margin-top: 8px; }
+.gap-4 { gap: 4px; }
 </style>
 </head>
 <body>
 <div class="layout">
-<nav class="sidebar">
-  <div class="sidebar-header"><span class="dot" id="sidebarDot"></span><span id="sidebarTitle">Novel-Claude</span></div>
-  <div class="sidebar-nav">
-    <button class="active" data-tab="write">✍️ 写作</button>
-    <button data-tab="dashboard">📊 总览</button>
-    <button data-tab="outline">📋 大纲</button>
-    <button data-tab="characters">👤 角色</button>
-    <button data-tab="world">🌍 世界</button>
-    <button data-tab="audit">🔍 审阅</button>
-    <button data-tab="memory">🧠 记忆</button>
-    <button data-tab="logs">📜 日志</button>
-    <button data-tab="settings">⚙️ 设置</button>
-  </div>
-  <div class="sidebar-footer" id="sidebarStatus"></div>
-</nav>
 
-<div class="main">
-  <div class="toolbar">
-    <select id="selGenre"><option>修仙</option></select>
-    <select id="selVolume"><option>1</option></select>
-    <span>卷</span>
-    <input id="selChapter" type="number" value="1" min="1">
-    <span>章</span>
-    <button class="btn-primary" onclick="doWrite()">生成</button>
-    <span class="sep"></span>
-    <select id="selMode" style="width:80px"><option value="quick">快速</option><option value="standard">标准</option><option value="deep">深度</option></select>
-    <span class="sep"></span>
-    <span id="toolbarStatus">就绪</span>
-    <span style="margin-left:auto;font-size:11px;color:var(--text3)" id="clock"></span>
+<!-- ─── Panel Left: 章节目录 ─── -->
+<div class="panel panel-left" id="panelLeft">
+  <div class="panel-header">
+    <span class="panel-header-title">章节目录</span>
+    <button class="panel-toggle" onclick="togglePanel('panelLeft')">&#9776;</button>
   </div>
-  <div class="content" id="mainContent"></div>
+  <div class="panel-body">
+    <!-- 章节列表 -->
+    <div class="left-section">
+      <div class="left-section-header" onclick="this.nextElementSibling.classList.toggle('hidden')">章节列表 <span>&#9660;</span></div>
+      <div class="left-section-body" id="chapterList"></div>
+    </div>
+    <!-- 故事蓝图 -->
+    <div class="left-section">
+      <div class="left-section-header">故事蓝图</div>
+      <div class="left-section-body" style="display:flex;gap:6px;padding:6px 10px 10px">
+        <button class="btn-secondary btn-sm" onclick="showWizard()" style="flex:1">新建故事</button>
+        <button class="btn-secondary btn-sm" onclick="showWizard()" style="flex:1">重新规划</button>
+      </div>
+    </div>
+    <!-- 新章按钮 -->
+    <div class="left-section" style="padding:6px 10px">
+      <button class="btn-primary btn-sm btn-block" onclick="showNewChapterModal()">+ 新章</button>
+    </div>
+    <!-- 故事引擎 -->
+    <div class="left-section">
+      <div class="left-section-header">故事引擎</div>
+      <div class="left-section-body" id="engineInfo" style="font-size:12px;color:var(--text2);line-height:1.6"></div>
+    </div>
+    <!-- 质量仪表 -->
+    <div class="left-section">
+      <div class="left-section-header">质量仪表</div>
+      <div class="left-section-body" id="gateInfo" style="font-size:12px"></div>
+    </div>
+  </div>
 </div>
 
-<aside class="right-panel" id="rightPanel">
-  <section><h4>项目</h4>
-    <div class="rp-row"><span>书名</span><span id="rpTitle">--</span></div>
-    <div class="rp-row"><span>体裁</span><span id="rpGenre">--</span></div>
-    <div class="rp-row"><span>总字数</span><span id="rpWords">0</span></div>
-    <div class="rp-row"><span>已完成</span><span id="rpChapters">0章</span></div>
-    <div class="rp-row"><span>角色</span><span id="rpChars">0</span></div>
-    <div class="rp-row"><span>剧情线</span><span id="rpThreads">0</span></div>
-    <div class="rp-row"><span>连接</span><span class="badge bg-ok" id="rpConn">--</span></div>
-  </section>
-  <section><h4>质量</h4>
-    <div id="rpGate" style="font-size:11px">--</div>
-    <div id="rpDiversity" style="font-size:11px;margin-top:4px">--</div>
-  </section>
-  <section><h4>操作</h4>
-    <button class="btn-secondary btn-block" onclick="doSnapshot()">📸 保存快照</button>
-    <button class="btn-secondary btn-block" onclick="doExport()">📦 导出 EPUB</button>
-    <button class="btn-secondary btn-block" onclick="doAnalyze()">📊 全本分析</button>
-    <button class="btn-secondary btn-block" onclick="doContinuity()">🔍 连续性检查</button>
-    <button class="btn-secondary btn-block" onclick="doDeAI()">🧹 去AI检测</button>
-  </section>
-  <section><h4>最近</h4><div class="rp-log" id="rpLog"><div>等待操作…</div></div></section>
-</aside>
+<!-- ─── Panel Center: 写作区 ─── -->
+<div class="panel panel-write">
+  <!-- Toolbar -->
+  <div class="toolbar" id="toolbar">
+    <select id="selGenre" title="体裁"></select>
+    <select id="selStyle" title="风格"></select>
+    <span class="sep"></span>
+    <input type="number" id="selVolume" value="1" min="1" style="width:50px" title="卷号">
+    <span style="color:var(--text3)">卷</span>
+    <input type="number" id="selChapter" value="1" min="1" style="width:50px" title="章号">
+    <span style="color:var(--text3)">章</span>
+    <span class="sep"></span>
+    <div class="mode-group">
+      <button id="modeQuick" class="active" onclick="switchMode('quick')">Quick</button>
+      <button id="modeStandard" onclick="switchMode('standard')">Standard</button>
+      <button id="modeDeep" onclick="switchMode('deep')">Deep</button>
+    </div>
+    <span class="sep"></span>
+    <button class="btn-primary btn-sm" onclick="doGenerate()">生成</button>
+    <button class="btn-secondary btn-sm" onclick="doPause()" id="btnPause" style="display:none">暂停</button>
+    <button class="btn-secondary btn-sm" onclick="doRewrite()">AI改写</button>
+    <button class="btn-secondary btn-sm" onclick="toggleWizard()">故事蓝图</button>
+    <button class="btn-secondary btn-sm" onclick="doSaveSnapshot()">保存快照</button>
+    <span class="sep"></span>
+    <button class="btn-secondary btn-xs" onclick="toggleFocus()" title="专注模式">专注</button>
+    <span id="tbStatus" style="margin-left:auto;font-size:11px;color:var(--text3)"></span>
+  </div>
+
+  <!-- Editor -->
+  <div class="editor-wrap" id="editorWrap">
+    <div class="editor-inner">
+      <textarea class="editor-textarea" id="editorTextarea" placeholder="在此写作，或点击「生成」让AI帮你写。每30秒自动保存。"></textarea>
+      <div class="editor-status">
+        <span>字数: <b id="statWords">0</b></span>
+        <span>速度: <b id="statSpeed">0</b> 字/分</span>
+        <span>用时: <b id="statTime">00:00</b></span>
+        <span>门控: <b id="statGate">--</b></span>
+        <span style="margin-left:auto" id="statSave">就绪</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wizard overlay (initially hidden) -->
+  <div class="wizard-overlay hidden" id="wizardOverlay" onclick="if(event.target===this)hideWizard()">
+    <div class="wizard-card">
+      <div class="wizard-header">
+        <div class="wizard-steps" id="wizardSteps">
+          <div class="wiz-step-dot active" id="wsd-0">1</div>
+          <div class="wiz-step-dot" id="wsd-1">2</div>
+          <div class="wiz-step-dot" id="wsd-2">3</div>
+          <div class="wiz-step-dot" id="wsd-3">4</div>
+          <div class="wiz-step-dot" id="wsd-4">5</div>
+        </div>
+        <button class="btn-secondary btn-sm" onclick="hideWizard()" style="background:none;color:var(--text3);font-size:18px">&times;</button>
+      </div>
+      <div class="wizard-body" id="wizardBody">
+        <!-- Step 0: 起点 -->
+        <div class="wizard-step active" id="wizs-0">
+          <div class="wiz-field">
+            <label>书名 *</label>
+            <input type="text" id="wizBookName" placeholder="输入小说书名">
+          </div>
+          <div class="wiz-field">
+            <label>体裁</label>
+            <select id="wizGenre"></select>
+          </div>
+          <div class="wiz-field">
+            <label>风格</label>
+            <select id="wizStyle"></select>
+          </div>
+          <div class="wiz-field">
+            <label>一句话简介</label>
+            <textarea id="wizBlurb" placeholder="用一句话概括你的故事"></textarea>
+          </div>
+          <div class="wizard-ai-discuss">
+            <div class="ai-header" onclick="this.nextElementSibling.classList.toggle('open')">&#128172; 与AI讨论</div>
+            <div class="ai-body">
+              <div class="wiz-chat-msgs" id="wizChat-start"></div>
+              <div class="wiz-chat-input">
+                <input type="text" id="wizChatInput-start" placeholder="和AI讨论你的故事起点..." onkeydown="if(event.key==='Enter')sendWizardChat('start')">
+                <button class="btn-primary btn-sm" onclick="sendWizardChat('start')">发送</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Step 1: 世界观 -->
+        <div class="wizard-step" id="wizs-1">
+          <div class="wiz-field">
+            <label>故事引擎约束</label>
+            <div style="font-size:12px;color:var(--text2);line-height:1.6" id="wizEngineConstraints"></div>
+          </div>
+          <div class="wiz-field">
+            <label>世界观设定</label>
+            <div contenteditable="true" id="wizWorldOutput" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;min-height:80px;font-size:13px;line-height:1.6"></div>
+          </div>
+          <button class="btn-primary btn-sm" onclick="generateWorldSetting()">AI生成世界观</button>
+          <div class="wizard-ai-discuss" style="margin-top:12px">
+            <div class="ai-header" onclick="this.nextElementSibling.classList.toggle('open')">&#128172; 与AI讨论</div>
+            <div class="ai-body">
+              <div class="wiz-chat-msgs" id="wizChat-world"></div>
+              <div class="wiz-chat-input">
+                <input type="text" id="wizChatInput-world" placeholder="讨论世界观..." onkeydown="if(event.key==='Enter')sendWizardChat('world')">
+                <button class="btn-primary btn-sm" onclick="sendWizardChat('world')">发送</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Step 2: 力量体系 -->
+        <div class="wizard-step" id="wizs-2">
+          <div class="wiz-field">
+            <label>力量体系设定</label>
+            <div contenteditable="true" id="wizPowerOutput" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;min-height:80px;font-size:13px;line-height:1.6"></div>
+          </div>
+          <button class="btn-primary btn-sm" onclick="generatePowerSystem()">AI生成力量体系</button>
+          <div class="wizard-ai-discuss" style="margin-top:12px">
+            <div class="ai-header" onclick="this.nextElementSibling.classList.toggle('open')">&#128172; 与AI讨论</div>
+            <div class="ai-body">
+              <div class="wiz-chat-msgs" id="wizChat-power"></div>
+              <div class="wiz-chat-input">
+                <input type="text" id="wizChatInput-power" placeholder="讨论力量体系..." onkeydown="if(event.key==='Enter')sendWizardChat('power')">
+                <button class="btn-primary btn-sm" onclick="sendWizardChat('power')">发送</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Step 3: 角色 -->
+        <div class="wizard-step" id="wizs-3">
+          <div class="wiz-field">
+            <label>主角设定</label>
+            <div contenteditable="true" id="wizCharOutput" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;min-height:80px;font-size:13px;line-height:1.6"></div>
+          </div>
+          <button class="btn-primary btn-sm" onclick="generateProtagonist()">AI生成主角</button>
+          <div class="wiz-field" style="margin-top:12px">
+            <label>添加配角</label>
+            <div style="display:flex;gap:6px">
+              <input type="text" id="wizSideName" placeholder="角色名" style="flex:1">
+              <input type="text" id="wizSideDesc" placeholder="描述" style="flex:2">
+              <button class="btn-secondary btn-sm" onclick="addSideCharacter()">添加</button>
+            </div>
+          </div>
+          <div class="wizard-ai-discuss" style="margin-top:12px">
+            <div class="ai-header" onclick="this.nextElementSibling.classList.toggle('open')">&#128172; 与AI讨论</div>
+            <div class="ai-body">
+              <div class="wiz-chat-msgs" id="wizChat-character"></div>
+              <div class="wiz-chat-input">
+                <input type="text" id="wizChatInput-character" placeholder="讨论角色..." onkeydown="if(event.key==='Enter')sendWizardChat('character')">
+                <button class="btn-primary btn-sm" onclick="sendWizardChat('character')">发送</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Step 4: 大纲 -->
+        <div class="wizard-step" id="wizs-4">
+          <div class="wiz-field">
+            <label>故事大纲</label>
+            <textarea id="wizOutline" placeholder="AI生成的故事大纲将显示在这里，也可以手动编辑" style="min-height:150px;font-size:13px"></textarea>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn-primary btn-sm" onclick="generateOutline()">AI生成大纲</button>
+            <button class="btn-secondary btn-sm" onclick="saveWizardOutline()">保存大纲</button>
+            <button class="btn-secondary btn-sm" onclick="addWizardVolume()">添加卷</button>
+          </div>
+          <div class="wizard-ai-discuss" style="margin-top:12px">
+            <div class="ai-header" onclick="this.nextElementSibling.classList.toggle('open')">&#128172; 与AI讨论</div>
+            <div class="ai-body">
+              <div class="wiz-chat-msgs" id="wizChat-outline"></div>
+              <div class="wiz-chat-input">
+                <input type="text" id="wizChatInput-outline" placeholder="讨论大纲..." onkeydown="if(event.key==='Enter')sendWizardChat('outline')">
+                <button class="btn-primary btn-sm" onclick="sendWizardChat('outline')">发送</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn-secondary btn-sm" id="wizPrev" onclick="goWizardStep(wizardState.currentStep-1)">&#8592; 上一步</button>
+        <button class="btn-secondary btn-sm" id="wizSkip" onclick="goWizardStep(wizardState.currentStep+1)">跳过</button>
+        <div class="spacer"></div>
+        <button class="btn-primary btn-sm" id="wizNext" onclick="handleWizardNext()">下一步 &#8594;</button>
+      </div>
+    </div>
+  </div>
 </div>
-<div id="toasts"></div>
+
+<!-- ─── Panel Right 1: 大纲细纲 ─── -->
+<div class="panel panel-right" id="panelRight1">
+  <div class="panel-header">
+    <span class="panel-header-title">大纲细纲</span>
+    <button class="panel-toggle" onclick="togglePanel('panelRight1')">&#9776;</button>
+  </div>
+  <div class="panel-body" style="display:flex;flex-direction:column">
+    <div class="tab-bar">
+      <button class="active" id="tabOutlineBtn" onclick="switchTab('outline',this)">细纲</button>
+      <button id="tabForeshadowBtn" onclick="switchTab('foreshadow',this)">伏笔</button>
+    </div>
+    <!-- Tab: 细纲 -->
+    <div class="tab-content active" id="tabOutline">
+      <textarea id="outlineText" placeholder="在此编辑故事细纲，停止输入3秒自动保存..."></textarea>
+      <div class="tab-actions">
+        <button class="btn-primary btn-sm" onclick="generateOutlineChapter()">AI生成细纲</button>
+        <span style="margin-left:auto;font-size:11px;color:var(--text3)" id="outlineSaveStatus"></span>
+      </div>
+      <div style="padding:8px 14px;font-size:11px;color:var(--text2);line-height:1.5;border-top:1px solid var(--border)" id="outlineConstraints"></div>
+    </div>
+    <!-- Tab: 伏笔 -->
+    <div class="tab-content" id="tabForeshadow">
+      <div class="fs-stats" id="fsStats">
+        <span>未解决<br><span class="num" id="fsUnresolved">0</span></span>
+        <span>已回收<br><span class="num" id="fsResolved">0</span></span>
+        <span>总计<br><span class="num" id="fsTotal">0</span></span>
+      </div>
+      <div style="padding:8px 14px">
+        <button class="btn-primary btn-sm btn-block" onclick="generateForeshadow()">生成伏笔</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Panel Right 2: 灵感工坊 ─── -->
+<div class="panel panel-right" id="panelRight2">
+  <div class="panel-header">
+    <span class="panel-header-title">灵感工坊</span>
+    <button class="panel-toggle" onclick="togglePanel('panelRight2')">&#9776;</button>
+  </div>
+  <div class="panel-body">
+    <!-- Module: 钩子工厂 -->
+    <div class="inspire-module">
+      <div class="inspire-header" onclick="toggleInspireModule(this)">
+        <span class="arrow">&#9660;</span> 钩子工厂
+      </div>
+      <div class="inspire-body">
+        <textarea id="hookInput" placeholder="输入关键词或留空让AI自由发挥..."></textarea>
+        <div class="btn-row">
+          <button class="btn-primary btn-sm" onclick="generateHook()">生成钩子</button>
+        </div>
+        <div class="output-box" id="hookOutput"></div>
+      </div>
+    </div>
+    <!-- Module: 章节构思 -->
+    <div class="inspire-module">
+      <div class="inspire-header" onclick="toggleInspireModule(this)">
+        <span class="arrow">&#9660;</span> 章节构思
+      </div>
+      <div class="inspire-body">
+        <textarea id="ideaInput" placeholder="输入你的章节想法..."></textarea>
+        <div class="btn-row">
+          <button class="btn-primary btn-sm" onclick="generateIdea()">展开细纲</button>
+        </div>
+        <div class="output-box" id="ideaOutput"></div>
+      </div>
+    </div>
+    <!-- Module: 质量仪表 -->
+    <div class="inspire-module">
+      <div class="inspire-header" onclick="toggleInspireModule(this)">
+        <span class="arrow">&#9660;</span> 质量仪表
+      </div>
+      <div class="inspire-body">
+        <div class="gate-display" id="qualityGateDisplay">
+          <div class="score" id="qgScore">--</div>
+          <div class="detail" id="qgDetail">加载中...</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary btn-sm btn-block" onclick="loadQualityGate()">刷新评分</button>
+        </div>
+      </div>
+    </div>
+    <!-- Module: AI对话 -->
+    <div class="inspire-module">
+      <div class="inspire-header" onclick="toggleInspireModule(this)">
+        <span class="arrow">&#9660;</span> AI对话
+      </div>
+      <div class="inspire-body">
+        <div class="chat-messages" id="inspireChatMsgs"></div>
+        <div class="chat-input-row">
+          <input type="text" id="inspireChatInput" placeholder="和AI讨论你的故事..." onkeydown="if(event.key==='Enter')inspireChatSend()">
+          <button class="btn-primary btn-sm" onclick="inspireChatSend()">发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div> <!-- /layout -->
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Modal: 新章 -->
+<div class="modal-overlay hidden" id="newChapterModal" onclick="if(event.target===this)hideNewChapterModal()">
+  <div class="modal-card">
+    <h3>新建章节</h3>
+    <div class="wiz-field">
+      <label>卷号</label>
+      <input type="number" id="ncVolume" value="1" min="1">
+    </div>
+    <div class="wiz-field">
+      <label>章号</label>
+      <input type="number" id="ncChapter" value="1" min="1">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary btn-sm" onclick="hideNewChapterModal()">取消</button>
+      <button class="btn-primary btn-sm" onclick="confirmNewChapter()">开始生成</button>
+    </div>
+  </div>
+</div>
 
 <script>
+// ── Utils ──
+function el(id) { return document.getElementById(id); }
+
+function escHtml(str) {
+  if (typeof str !== 'string') return '';
+  var d = document.createElement('div');
+  d.appendChild(document.createTextNode(str));
+  return d.innerHTML;
+}
+
+function showToast(msg, isError) {
+  var c = el('toastContainer');
+  var d = document.createElement('div');
+  d.className = 'toast ' + (isError ? 'err' : 'ok');
+  d.textContent = msg;
+  c.appendChild(d);
+  setTimeout(function() { if (d.parentNode) d.remove(); }, 3000);
+}
+
+function logMsg(msg) {
+  var s = el('tbStatus');
+  if (s) s.textContent = msg;
+}
+
 // ── State ──
-let currentTab = 'write';
-const TABS = ['write','dashboard','outline','characters','world','audit','memory','logs','settings'];
-let statusData = {};
+var wizardState = {
+  currentStep: 0,
+  totalSteps: 5,
+  data: {},
+  chatHistory: {}
+};
+var currentAbort = null;
+var statusData = {};
+var currentMode = 'quick';
+var outlineSaveTimer = null;
+var editorAutosaveTimer = null;
+var editorStartTime = Date.now();
 
-// ── Tabs ──
-function showTab(name) {
-  currentTab = name;
-  document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
-  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
-  const content = document.getElementById('mainContent');
-  content.innerHTML = panels[name] || panels['write'];
-  if (name === 'dashboard') loadDashboard();
-    if (name === 'characters') loadCharacters();
-    if (name === 'world') loadWorld();
-    if (name === 'audit') loadAudit();
-    if (name === 'memory') loadMemory();
-    if (name === 'logs') loadLogs();
-    if (name === 'settings') loadSettings();
-    if (name === 'outline') { setTimeout(async () => { const r = await api('/api/outline'); if (r?.outline) document.getElementById('outlineText').value = r.outline; }, 100); }
-  if (name === 'characters') loadCharacters();
-  if (name === 'world') loadWorld();
-  if (name === 'audit') loadAudit();
-  if (name === 'memory') loadMemory();
-  if (name === 'logs') loadLogs();
-  if (name === 'settings') loadSettings();
-  if (name === 'outline') loadOutline();
-}
-document.querySelectorAll('.sidebar-nav button').forEach(b => {
-  b.addEventListener('click', () => showTab(b.dataset.tab));
-});
-
-// ── API ──
-async function api(url, opts={}) {
-  try { const r = await fetch(url, opts); return r.ok ? r.json() : null; }
-  catch(e) { toast('网络错误',false); return null; }
-}
-function toast(msg, ok=true) {
-  const c = document.getElementById('toasts');
-  const d = document.createElement('div');
-  d.className = `toast ${ok?'toast-ok':'toast-err'}`;
-  d.textContent = msg; c.appendChild(d);
-  setTimeout(() => d.remove(), 2500);
-}
-function rpLog(msg) {
-  const el = document.getElementById('rpLog');
-  el.innerHTML = `<div>${new Date().toLocaleTimeString()} ${msg}</div>` + el.innerHTML;
-  if (el.children.length > 30) el.lastElementChild.remove();
-}
-
-// ── Status ──
-async function refreshStatus() {
-  const r = await api('/api/status');
-  if (!r) return;
-  statusData = r;
-  document.getElementById('sidebarTitle').textContent = r.title || 'Novel-Claude';
-  document.getElementById('sidebarStatus').textContent = `${r.provider} · ${r.model?.slice(0,15)||'?'}`;
-  document.getElementById('sidebarDot').style.background = r.connected ? 'var(--success)' : 'var(--danger)';
-  document.getElementById('toolbarStatus').textContent = r.connected ? '在线' : '离线';
-  document.getElementById('rpTitle').textContent = r.title||'--';
-  document.getElementById('rpGenre').textContent = r.genre||'--';
-  document.getElementById('rpWords').textContent = (r.chapters||[]).reduce((s,c)=>s+(c.words||0),0).toLocaleString();
-  document.getElementById('rpChapters').textContent = `${r.chapter_count||0}章`;
-  document.getElementById('rpChars').textContent = r.char_count||0;
-  document.getElementById('rpThreads').textContent = r.thread_count||0;
-  document.getElementById('rpConn').textContent = r.connected?'在线':'离线';
-  document.getElementById('rpConn').className = r.connected?'badge bg-ok':'badge bg-err';
-  if (r.last_gate) {
-    const g = r.last_gate;
-    document.getElementById('rpGate').innerHTML = `门控: <b>${g.score}分</b> ${g.verdict} · 第${g.round}轮`;
-  }
-  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
-}
-refreshStatus(); setInterval(refreshStatus, 15000);
-
-// ── Write ──
-async function doWrite() {
-  const vol = parseInt(document.getElementById('selVolume').value)||1;
-  const ch = parseInt(document.getElementById('selChapter').value)||1;
-  const mode = document.getElementById('selMode').value;
-  const output = document.getElementById('writeOutput');
-  output.textContent = '生成中…'; rpLog(`开始生成 V${vol}C${ch}`);
+// ── streamSSE ──
+async function streamSSE(url, opts, onToken, onDone, onError, onStatus) {
   try {
-    const r = await fetch(`/api/write-stream?mode=${mode}`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({volume:vol, chapter:ch})
-    });
-    const reader = r.body.getReader(); const decoder = new TextDecoder();
-    let full = '';
+    var resp = await fetch(url, opts);
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
     while (true) {
-      const {done, value} = await reader.read();
-      if (done) break;
-      for (const line of decoder.decode(value).split('\n')) {
-        if (!line.startsWith('data: ')) continue;
-        try {
-          const d = JSON.parse(line.slice(6));
-          if (d.type==='stream'||d.type==='token') { full += d.text||d.token; output.textContent = full; }
-          else if (d.type==='done'||d.type==='complete') {
-            output.textContent = full;
-            const wc = d.words||full.length;
-            document.getElementById('writeWords').textContent = wc;
-            document.getElementById('writeGate').textContent = d.gate_verdict||'无';
-            document.getElementById('selChapter').value = ch+1;
-            toast(`完成: ${wc}字`, true);
-            rpLog(`V${vol}C${ch} 完成(${wc}字) gate:${d.gate_verdict||'none'}`);
-            refreshStatus();
+      var result = await reader.read();
+      if (result.done) break;
+      buffer += decoder.decode(result.value, {stream: true});
+      var lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (line.startsWith('data: ')) {
+          var data = line.slice(6).trim();
+          if (data === '[DONE]') {
+            if (onDone) onDone();
+            return;
           }
-          else if (d.type==='error') { output.textContent = '错误: '+d.msg; toast(d.msg, false); }
-          else if (d.type==='agent_progress') { output.textContent = `Agent: ${d.stage} (${Math.round(d.progress*100)}%)`; }
-          else if (d.type==='agent_result') { output.textContent = full; }
-          else if (d.type==='status') { output.textContent = d.msg; }
-        } catch(e) {}
+          try {
+            var parsed = JSON.parse(data);
+            var token = parsed.choices?.[0]?.delta?.content || parsed.delta?.content || parsed.content || parsed.text || '';
+            if (token && onToken) onToken(token);
+            if (parsed.type === 'error' && onError) onError(parsed.msg || '未知错误');
+            if (parsed.type === 'done' && onDone) onDone(parsed);
+            if (parsed.type === 'complete' && onDone) onDone(parsed);
+            if (parsed.type === 'status' && onStatus) onStatus(parsed.msg);
+          } catch(e) {}
+        }
       }
     }
-  } catch(e) { toast('生成失败: '+e.message, false); }
-  refreshStatus();
-}
-
-// ── Dashboard ──
-async function loadDashboard() {
-  const r = await api('/api/status'); if (!r) return;
-  const words = (r.chapters||[]).reduce((s,c)=>s+(c.words||0),0);
-  document.getElementById('dashWords').textContent = words.toLocaleString();
-  document.getElementById('dashChapters').textContent = r.chapter_count||0;
-  document.getElementById('dashChars').textContent = r.char_count||0;
-  document.getElementById('dashThreads').textContent = r.thread_count||0;
-  if (r.last_gate) {
-    const g = r.last_gate;
-    document.getElementById('dashGate').innerHTML = `<b>${g.score}分 (${g.verdict})</b> · ${g.round}轮 · 严重:${g.critical}`;
-  }
-  const d = await api('/api/diversity');
-  if (d?.score !== undefined) {
-    document.getElementById('dashDiversity').innerHTML = `<b>${d.score}/100</b> · ${d.chapters?.length||0}章 · ${d.issues?.[0]||'良'}`;
+    if (onDone) onDone();
+  } catch(e) {
+    if (onError) onError(e.message);
   }
 }
 
-// ── Characters ──
-async function loadCharacters() {
-  document.getElementById('mainContent').innerHTML = panels['characters'];
-  const r = await api('/api/status'); if (!r) return;
-  const el = document.getElementById('charContent');
-  if (!el) return;
-  let h = '<table style="width:100%;font-size:13px;border-collapse:collapse"><tr style="color:var(--text2);font-size:11px"><th>章</th><th>标题</th><th>状态</th><th>字数</th></tr>';
-  for (const c of (r.chapters||[]).slice(-15).reverse()) {
-    h += '<tr><td style="padding:4px 0;border-bottom:1px solid var(--surface2)">'+c.num+'</td><td>'+ (c.title||'') +'</td><td>'+ (c.status||'') +'</td><td>'+ (c.words||0) +'</td></tr>';
-  }
-  h += '</table>';
-  el.innerHTML = '<p>角色数: <b>'+ (r.char_count||0) +'</b> | 剧情线: <b>'+ (r.thread_count||0) +'</b></p>' + h;
+// ── llamaStream ──
+function llamaStream(messages, onToken, onDone, onError, signal) {
+  return streamSSE('http://localhost:61183/v1/chat/completions', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      model: 'qwen3.6-27b-uncensored',
+      messages: messages,
+      stream: true,
+      chat_template_kwargs: {enable_thinking: false}
+    }),
+    signal: signal
+  }, onToken, onDone, onError);
 }
 
-// ── World ──
-async function loadWorld() {
-  document.getElementById('mainContent').innerHTML = panels['world'];
-  const r = await api('/api/status'); if (!r) return;
-  const el = document.getElementById('worldContent');
-  if (!el) return;
-  let h = '<p>书名: <b>'+ (r.title||'--') +'</b> | 体裁: <b>'+ (r.genre||'--') +'</b> | 连接: <b>'+ (r.connected?'在线':'离线') +'</b></p>';
-  h += '<div style="margin-top:8px"><b>模块状态</b></div>';
-  const mods = r.modules||{};
-  for (const [k,v] of Object.entries(mods)) {
-    h += '<div class="rp-row"><span>'+k+'</span><span class="badge '+(v?'bg-ok':'bg-warn')+'">'+(v?'启用':'禁用')+'</span></div>';
-  }
-  el.innerHTML = h;
+// ── fetch helper ──
+function apiGet(url) {
+  return fetch(url).then(function(r) { return r.ok ? r.json() : null; }).catch(function(e) { showToast('请求失败: ' + e.message, true); return null; });
 }
 
-// ── Audit ──
-async function loadAudit() {
-  document.getElementById('mainContent').innerHTML = panels['audit'];
-  const [qr, dr] = await Promise.all([api('/api/quality-gate'), api('/api/diversity')]);
-  if (qr?.available) {
-    const g = qr.result; const el = document.getElementById('auditGate');
-    if (el) el.innerHTML = '<b>'+g.overall_score+'分 ('+g.verdict+')</b> · 第'+g.rewrite_round+'轮 · 严重:'+(g.continuity_critical||0);
+function apiPost(url, body) {
+  return fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.ok ? r.json() : null; }).catch(function(e) { showToast('请求失败: ' + e.message, true); return null; });
+}
+
+// ── loadStatus ──
+function loadStatus() {
+  apiGet('/api/status').then(function(r) {
+    if (!r) return;
+    statusData = r;
+    renderChapterList(r);
+    updateGateInfo(r);
+    logMsg(r.connected ? '在线' : '离线');
+  });
+}
+
+// ── loadStoryEngine ──
+function loadStoryEngine() {
+  apiGet('/api/story-engine').then(function(r) {
+    if (!r) return;
+    var genres = r.genres || [];
+    var styles = r.styles || [];
+    var elGenre = el('selGenre');
+    var elStyle = el('selStyle');
+    var elWizGenre = el('wizGenre');
+    var elWizStyle = el('wizStyle');
+    if (elGenre) {
+      elGenre.innerHTML = '';
+      for (var i = 0; i < genres.length; i++) {
+        elGenre.innerHTML += '<option value="' + escHtml(genres[i]) + '">' + escHtml(genres[i]) + '</option>';
+      }
+    }
+    if (elStyle) {
+      elStyle.innerHTML = '';
+      for (var i = 0; i < styles.length; i++) {
+        elStyle.innerHTML += '<option value="' + escHtml(styles[i]) + '">' + escHtml(styles[i]) + '</option>';
+      }
+    }
+    if (elWizGenre) {
+      elWizGenre.innerHTML = '';
+      for (var i = 0; i < genres.length; i++) {
+        elWizGenre.innerHTML += '<option value="' + escHtml(genres[i]) + '">' + escHtml(genres[i]) + '</option>';
+      }
+    }
+    if (elWizStyle) {
+      elWizStyle.innerHTML = '';
+      for (var i = 0; i < styles.length; i++) {
+        elWizStyle.innerHTML += '<option value="' + escHtml(styles[i]) + '">' + escHtml(styles[i]) + '</option>';
+      }
+    }
+    // Engine info in left panel
+    var ei = el('engineInfo');
+    if (ei) {
+      ei.innerHTML = '<div><b>体裁:</b> ' + escHtml(r.current_genre || '--') + '</div>' +
+        '<div><b>风格:</b> ' + escHtml(r.current_style || '--') + '</div>' +
+        '<div style="margin-top:4px;font-size:11px">' + escHtml(r.constraints || '') + '</div>';
+    }
+    // Wizard engine constraints
+    var wizEc = el('wizEngineConstraints');
+    if (wizEc) wizEc.textContent = r.constraints || '无特殊约束';
+    // Outline constraints
+    var oc = el('outlineConstraints');
+    if (oc) oc.textContent = '约束: ' + (r.constraints || '无');
+  });
+}
+
+// ── loadChapterList ──
+function loadChapterList() {
+  apiGet('/api/chapters').then(function(r) {
+    if (!r) return;
+    // r is array of volumes with chapters
+    var cl = el('chapterList');
+    if (!cl) return;
+    var html = '';
+    if (Array.isArray(r)) {
+      for (var v = 0; v < r.length; v++) {
+        var vol = r[v];
+        var volLabel = vol.volume || ('第' + (v + 1) + '卷');
+        html += '<div class="vol-header">' + escHtml(volLabel) + '</div>';
+        var chs = vol.chapters || [];
+        for (var c = 0; c < chs.length; c++) {
+          var ch = chs[c];
+          var chNum = ch.num || (c + 1);
+          html += '<div class="chapter-item" onclick="loadChapter(\'' + escHtml(vol.volume || 'vol_01') + '\',' + chNum + ')">';
+          html += '<span class="ch-num">#' + chNum + '</span>';
+          html += '<span class="ch-title">' + escHtml(ch.title || '') + '</span>';
+          html += '<span class="ch-words">' + (ch.words || 0) + '字</span>';
+          html += '</div>';
+        }
+      }
+    }
+    cl.innerHTML = html || '<div style="padding:8px;color:var(--text3);font-size:12px">暂无章节</div>';
+  });
+}
+
+// ── renderChapterList (from /api/status) ──
+function renderChapterList(data) {
+  var cl = el('chapterList');
+  if (!cl) return;
+  var chapters = data.chapters || [];
+  if (chapters.length === 0) {
+    cl.innerHTML = '<div style="padding:8px;color:var(--text3);font-size:12px">暂无章节</div>';
+    return;
   }
-  if (dr?.score !== undefined) {
-    const el = document.getElementById('auditDiv');
-    if (el) el.innerHTML = '<b>'+dr.score+'/100</b> · '+dr.chapters.length+'章分析' + (dr.issues?.length ? '<br>'+dr.issues.slice(0,3).join('<br>') : '');
+  var html = '';
+  // Group by volume
+  var volMap = {};
+  for (var i = 0; i < chapters.length; i++) {
+    var ch = chapters[i];
+    var v = ch.volume || 1;
+    if (!volMap[v]) volMap[v] = [];
+    volMap[v].push(ch);
   }
-  // Load continuity
-  const cr = await api('/api/continuity');
-  if (cr) {
-    const el = document.getElementById('auditCont');
-    if (el) el.innerHTML = '发现: '+ (cr.issues?.length||cr.findings?.length||0) +'个问题';
+  var vols = Object.keys(volMap).sort(function(a,b) { return parseInt(a) - parseInt(b); });
+  for (var vi = 0; vi < vols.length; vi++) {
+    var vk = vols[vi];
+    html += '<div class="vol-header">第' + vk + '卷</div>';
+    var chs = volMap[vk];
+    for (var ci = 0; ci < chs.length; ci++) {
+      var ch = chs[ci];
+      html += '<div class="chapter-item" onclick="loadChapter(' + ch.volume + ',' + ch.num + ')">';
+      html += '<span class="ch-num">#' + ch.num + '</span>';
+      html += '<span class="ch-title">' + escHtml(ch.title || '') + '</span>';
+      html += '<span class="ch-words">' + (ch.words || 0) + '字</span>';
+      html += '</div>';
+    }
   }
-  // DeAI
-  const dr2 = await api('/api/deai');
-  if (dr2?.overall_score !== undefined) {
-    const el = document.getElementById('auditDeAI');
-    if (el) el.innerHTML = 'DeAI评分: <b>'+dr2.overall_score+'</b>/100';
+  cl.innerHTML = html;
+}
+
+// ── updateGateInfo ──
+function updateGateInfo(data) {
+  var gi = el('gateInfo');
+  if (!gi) return;
+  var g = data.last_gate;
+  if (g) {
+    gi.innerHTML = '<div>评分: <b>' + (g.score || 0) + '分</b></div>' +
+      '<div style="font-size:11px;color:var(--text2)">' + (g.verdict || '--') + ' · 第' + (g.round || 0) + '轮</div>';
+  } else {
+    gi.innerHTML = '<span style="color:var(--text3)">暂无评分</span>';
+  }
+  // Stat gate
+  var sg = el('statGate');
+  if (sg) sg.textContent = (g && g.score) ? (g.score + '分 ' + (g.verdict || '')) : '--';
+}
+
+// ── loadChapter ──
+function loadChapter(vol, ch) {
+  apiGet('/api/chapters/read?vol=vol_' + String(vol).padStart(2,'0') + '&num=' + ch).then(function(r) {
+    if (!r) return;
+    var ta = el('editorTextarea');
+    if (ta) {
+      ta.value = r.content || '';
+      onEditorInput();
+    }
+    el('selVolume').value = vol;
+    el('selChapter').value = ch;
+    showToast('已加载 第' + vol + '卷第' + ch + '章');
+  });
+}
+
+// ── doGenerate ──
+function doGenerate() {
+  var vol = parseInt(el('selVolume').value) || 1;
+  var ch = parseInt(el('selChapter').value) || 1;
+  var mode = currentMode;
+  var ta = el('editorTextarea');
+  if (!ta) return;
+
+  if (currentAbort) {
+    currentAbort.abort();
+    currentAbort = null;
+  }
+
+  // Show pause button
+  el('btnPause').style.display = '';
+
+  var ac = new AbortController();
+  currentAbort = ac;
+  ta.value = '';
+  logMsg('生成中 V' + vol + 'C' + ch + '...');
+  var fullText = '';
+
+  fetch('/api/write-stream?mode=' + mode, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({volume: vol, chapter: ch}),
+    signal: ac.signal
+  }).then(function(resp) {
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+
+    function readChunk() {
+      reader.read().then(function(result) {
+        if (result.done) {
+          el('btnPause').style.display = 'none';
+          currentAbort = null;
+          logMsg('生成完成');
+          showToast('生成完成: ' + fullText.length + '字');
+          return;
+        }
+        buffer += decoder.decode(result.value, {stream: true});
+        var lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (!line.startsWith('data: ')) continue;
+          try {
+            var d = JSON.parse(line.slice(6));
+            if (d.type === 'stream' || d.type === 'token') {
+              fullText += d.text || d.token || '';
+              ta.value = fullText;
+              ta.scrollTop = ta.scrollHeight;
+              updateWordCount();
+            } else if (d.type === 'done' || d.type === 'complete') {
+              ta.value = fullText;
+              updateWordCount();
+              var wc = d.words || fullText.length;
+              el('statWords').textContent = wc;
+              el('statGate').textContent = d.gate_verdict || '--';
+              el('selChapter').value = ch + 1;
+              showToast('完成: ' + wc + '字');
+              logMsg('完成 V' + vol + 'C' + ch + ' (' + wc + '字)');
+            } else if (d.type === 'error') {
+              showToast('错误: ' + d.msg, true);
+              logMsg('错误: ' + d.msg);
+            } else if (d.type === 'agent_progress') {
+              logMsg('Agent: ' + d.stage + ' ' + Math.round(d.progress * 100) + '%');
+            } else if (d.type === 'status') {
+              logMsg(d.msg);
+            } else if (d.type === 'agent_result') {
+              fullText = ta.value; // keep what we have
+            }
+          } catch(e) {}
+        }
+        readChunk();
+      }).catch(function(e) {
+        if (e.name === 'AbortError') return;
+        showToast('读取失败: ' + e.message, true);
+        el('btnPause').style.display = 'none';
+        currentAbort = null;
+      });
+    }
+    readChunk();
+  }).catch(function(e) {
+    if (e.name === 'AbortError') return;
+    showToast('生成失败: ' + e.message, true);
+    el('btnPause').style.display = 'none';
+    currentAbort = null;
+  });
+}
+
+// ── doPause ──
+function doPause() {
+  if (currentAbort) {
+    currentAbort.abort();
+    currentAbort = null;
+  }
+  el('btnPause').style.display = 'none';
+  logMsg('已暂停');
+  showToast('已暂停生成');
+}
+
+// ── doRewrite ──
+function doRewrite() {
+  var ta = el('editorTextarea');
+  if (!ta) return;
+  var sel = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+  if (!sel) {
+    showToast('请先选中要改写的文本', true);
+    return;
+  }
+  var prompt = prompt('输入改写要求（风格、语气等）:');
+  if (!prompt) return;
+
+  showToast('改写中...');
+  var ac = new AbortController();
+  currentAbort = ac;
+  var rewritten = '';
+
+  fetch('/api/deai-rewrite', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text: sel, prompt: prompt}),
+    signal: ac.signal
+  }).then(function(resp) {
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+
+    function readChunk() {
+      reader.read().then(function(result) {
+        if (result.done) {
+          // Replace selection
+          ta.value = ta.value.substring(0, ta.selectionStart) + rewritten + ta.value.substring(ta.selectionEnd);
+          currentAbort = null;
+          updateWordCount();
+          showToast('改写完成');
+          return;
+        }
+        buffer += decoder.decode(result.value, {stream: true});
+        var lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (!line.startsWith('data: ')) continue;
+          try {
+            var d = JSON.parse(line.slice(6));
+            var text = d.text || d.token || d.content || '';
+            if (text) rewritten += text;
+          } catch(e) {}
+        }
+        readChunk();
+      }).catch(function(e) {
+        if (e.name === 'AbortError') return;
+        showToast('改写失败: ' + e.message, true);
+        currentAbort = null;
+      });
+    }
+    readChunk();
+  }).catch(function(e) {
+    if (e.name === 'AbortError') return;
+    showToast('改写请求失败: ' + e.message, true);
+    currentAbort = null;
+  });
+}
+
+// ── Editor helpers ──
+function updateWordCount() {
+  var ta = el('editorTextarea');
+  if (!ta) return;
+  var text = ta.value;
+  var chars = (text.match(/[一-鿿]/g) || []).length;
+  el('statWords').textContent = chars;
+  var mins = Math.max(1, Math.floor((Date.now() - editorStartTime) / 60000));
+  el('statSpeed').textContent = Math.floor(chars / mins);
+  var totalSec = Math.floor((Date.now() - editorStartTime) / 1000);
+  var m = Math.floor(totalSec / 60);
+  var s = totalSec % 60;
+  el('statTime').textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function onEditorInput() {
+  updateWordCount();
+  clearTimeout(editorAutosaveTimer);
+  editorAutosaveTimer = setTimeout(function() {
+    var ta = el('editorTextarea');
+    if (ta) {
+      localStorage.setItem('novel_claude_draft', ta.value);
+      var st = el('statSave');
+      if (st) {
+        st.textContent = '已保存 ' + new Date().toLocaleTimeString();
+        st.style.color = 'var(--success)';
+      }
+    }
+  }, 30000);
+}
+
+// ── switchMode ──
+function switchMode(mode) {
+  currentMode = mode;
+  var ids = ['modeQuick', 'modeStandard', 'modeDeep'];
+  for (var i = 0; i < ids.length; i++) {
+    var btn = el(ids[i]);
+    if (btn) btn.classList.remove('active');
+  }
+  var activeBtn = el('mode' + mode.charAt(0).toUpperCase() + mode.slice(1));
+  if (activeBtn) activeBtn.classList.add('active');
+  logMsg('模式: ' + mode);
+}
+
+// ── togglePanel ──
+function togglePanel(panelId) {
+  var p = el(panelId);
+  if (!p) return;
+  p.classList.toggle('collapsed');
+}
+
+// ── toggleFocus ──
+function toggleFocus() {
+  document.querySelector('.layout').classList.toggle('focus-mode');
+}
+
+// ── toggleInspireModule ──
+function toggleInspireModule(headerEl) {
+  if (!headerEl) return;
+  headerEl.classList.toggle('collapsed');
+  var body = headerEl.nextElementSibling;
+  if (body) body.classList.toggle('collapsed');
+}
+
+// ── Wizard ──
+function showWizard() {
+  el('wizardOverlay').classList.remove('hidden');
+  goWizardStep(wizardState.currentStep);
+}
+
+function hideWizard() {
+  el('wizardOverlay').classList.add('hidden');
+}
+
+function toggleWizard() {
+  var wo = el('wizardOverlay');
+  if (wo.classList.contains('hidden')) {
+    showWizard();
+  } else {
+    hideWizard();
   }
 }
 
-// ── Memory ──
-async function loadMemory() {
-  document.getElementById('mainContent').innerHTML = panels['memory'];
-  const [lr, sr] = await Promise.all([api('/api/logs?lines=15'), api('/api/snapshots')]);
-  const el1 = document.getElementById('memLogs');
-  if (el1 && lr?.available) {
-    el1.innerHTML = lr.lines.map(l=>'<div style="font-size:11px;font-family:monospace;padding:1px 0">'+l.substring(11,80)+'</div>').join('');
+function goWizardStep(n) {
+  if (n < 0) n = 0;
+  if (n >= wizardState.totalSteps) {
+    hideWizard();
+    return;
   }
-  const el2 = document.getElementById('memSnaps');
-  if (el2 && sr?.snapshots?.length) {
-    el2.innerHTML = sr.snapshots.slice(0,10).map(s=>'<div style="padding:2px 0;border-bottom:1px solid var(--surface2)">'+s.id.substring(0,15)+' '+ (s.label||'') +' ('+s.chapter_count+'章 '+s.total_words+'字)</div>').join('');
+  collectStepData(wizardState.currentStep);
+  wizardState.currentStep = n;
+
+  // Update dots
+  for (var i = 0; i < wizardState.totalSteps; i++) {
+    var dot = el('wsd-' + i);
+    if (!dot) continue;
+    dot.className = 'wiz-step-dot';
+    if (i < n) dot.classList.add('done');
+    else if (i === n) dot.classList.add('active');
+    // also set text
+    dot.textContent = i < n ? '✓' : (i + 1);
+  }
+
+  // Update step content
+  for (var i = 0; i < wizardState.totalSteps; i++) {
+    var step = el('wizs-' + i);
+    if (step) step.classList.toggle('active', i === n);
+  }
+
+  // Update buttons
+  el('wizPrev').style.display = n === 0 ? 'none' : '';
+  el('wizSkip').style.display = n < wizardState.totalSteps - 1 ? '' : 'none';
+  var nextBtn = el('wizNext');
+  if (n === wizardState.totalSteps - 1) {
+    nextBtn.textContent = '✅ 完成';
+    nextBtn.onclick = hideWizard;
+  } else {
+    nextBtn.textContent = '→ 下一步';
+    nextBtn.onclick = function() { goWizardStep(wizardState.currentStep + 1); };
   }
 }
 
-// ── Logs ──
-async function loadLogs() {
-  document.getElementById('mainContent').innerHTML = panels['logs'];
-  const r = await api('/api/logs?lines=60');
-  if (r?.available) { document.getElementById('logContent').textContent = r.lines.join('\n'); }
-  else { document.getElementById('logContent').textContent = '无日志文件'; }
+function handleWizardNext() {
+  if (wizardState.currentStep >= wizardState.totalSteps - 1) {
+    hideWizard();
+  } else {
+    goWizardStep(wizardState.currentStep + 1);
+  }
 }
 
-// ── Settings ──
-async function loadSettings() {
-  document.getElementById('mainContent').innerHTML = panels['settings'];
-  const r = await api('/api/config'); if (!r) return;
-  const sg = document.getElementById('cfgGenre');
-  if (sg) { sg.innerHTML = (r.genres||['修仙']).map(g=>`<option>${g}</option>`).join(''); }
-  const ss = document.getElementById('cfgStyle');
-  if (ss) { ss.innerHTML = (r.styles||['网文爽文']).map(s=>`<option>${s}</option>`).join(''); }
+function collectStepData(step) {
+  var key = getStepKey(step);
+  var data = {};
+  if (step === 0) {
+    data.bookName = el('wizBookName') ? el('wizBookName').value : '';
+    data.genre = el('wizGenre') ? el('wizGenre').value : '';
+    data.style = el('wizStyle') ? el('wizStyle').value : '';
+    data.blurb = el('wizBlurb') ? el('wizBlurb').value : '';
+  } else if (step === 1) {
+    data.world = el('wizWorldOutput') ? el('wizWorldOutput').textContent : '';
+  } else if (step === 2) {
+    data.power = el('wizPowerOutput') ? el('wizPowerOutput').textContent : '';
+  } else if (step === 3) {
+    data.protagonist = el('wizCharOutput') ? el('wizCharOutput').textContent : '';
+  } else if (step === 4) {
+    data.outline = el('wizOutline') ? el('wizOutline').value : '';
+  }
+  wizardState.data[key] = data;
 }
 
-// Event delegation
-document.addEventListener('click', async e => {
-  const t = e.target;
-  if (t.id === 'cfgSave') {
-    const g = document.getElementById('cfgGenre')?.value; const s = document.getElementById('cfgStyle')?.value;
-    const m = document.getElementById('cfgMode')?.value||'quick';
-    if (g) { await api('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({genre:g, style:s, workflow:{mode:m}})}); toast('已保存'); refreshStatus(); }
+function getStepKey(step) {
+  var keys = ['start', 'world', 'power', 'character', 'outline'];
+  return keys[step] || 'start';
+}
+
+// ── Wizard AI generation helpers ──
+function generateWorldSetting() {
+  collectStepData(0);
+  var data = wizardState.data.start || {};
+  var prompt = '根据以下信息生成世界观设定：\n书名：' + (data.bookName || '未命名') + '\n体裁：' + (data.genre || '未指定') + '\n简介：' + (data.blurb || '无');
+  var out = el('wizWorldOutput');
+  if (!out) return;
+  out.textContent = '生成中...';
+  llamaStream([
+    {role: 'system', content: '你是一个专业的网文创作顾问，擅长世界观构建。'},
+    {role: 'user', content: prompt}
+  ], function(token) {
+    if (out.textContent === '生成中...') out.textContent = '';
+    out.textContent += token;
+  }, function() {
+    showToast('世界观生成完成');
+  }, function(err) {
+    showToast('生成失败: ' + err, true);
+  });
+}
+
+function generatePowerSystem() {
+  var out = el('wizPowerOutput');
+  if (!out) return;
+  out.textContent = '生成中...';
+  llamaStream([
+    {role: 'system', content: '你是一个专业的网文创作顾问，擅长设计力量体系。'},
+    {role: 'user', content: '为以下故事设计力量体系：\n书名：' + (el('wizBookName') ? el('wizBookName').value : '未命名') + '\n体裁：' + (el('wizGenre') ? el('wizGenre').value : '未指定')}
+  ], function(token) {
+    if (out.textContent === '生成中...') out.textContent = '';
+    out.textContent += token;
+  }, function() {
+    showToast('力量体系生成完成');
+  }, function(err) {
+    showToast('生成失败: ' + err, true);
+  });
+}
+
+function generateProtagonist() {
+  var out = el('wizCharOutput');
+  if (!out) return;
+  out.textContent = '生成中...';
+  llamaStream([
+    {role: 'system', content: '你是一个专业的网文创作顾问，擅长角色设计。'},
+    {role: 'user', content: '为主角创建设定：\n书名：' + (el('wizBookName') ? el('wizBookName').value : '未命名') + '\n体裁：' + (el('wizGenre') ? el('wizGenre').value : '未指定')}
+  ], function(token) {
+    if (out.textContent === '生成中...') out.textContent = '';
+    out.textContent += token;
+  }, function() {
+    showToast('主角生成完成');
+  }, function(err) {
+    showToast('生成失败: ' + err, true);
+  });
+}
+
+function addSideCharacter() {
+  var name = el('wizSideName') ? el('wizSideName').value : '';
+  var desc = el('wizSideDesc') ? el('wizSideDesc').value : '';
+  if (!name) { showToast('请输入角色名', true); return; }
+  var out = el('wizCharOutput');
+  if (out) {
+    out.textContent += '\n\n配角：' + name + (desc ? ' - ' + desc : '');
   }
-  if (t.id === 'cfgSFApply') {
-    const v = document.getElementById('cfgSF')?.value; if(!v) return;
-    await api('/api/storyform', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({template:v})}); toast('已应用');
+  el('wizSideName').value = '';
+  el('wizSideDesc').value = '';
+  showToast('已添加配角');
+}
+
+function generateOutline() {
+  var ta = el('wizOutline');
+  if (!ta) return;
+  ta.value = '生成中...';
+  llamaStream([
+    {role: 'system', content: '你是一个专业的网文创作顾问，擅长故事大纲规划。'},
+    {role: 'user', content: '生成故事大纲：\n书名：' + (el('wizBookName') ? el('wizBookName').value : '未命名') + '\n体裁：' + (el('wizGenre') ? el('wizGenre').value : '未指定')}
+  ], function(token) {
+    if (ta.value === '生成中...') ta.value = '';
+    ta.value += token;
+  }, function() {
+    showToast('大纲生成完成');
+  }, function(err) {
+    showToast('生成失败: ' + err, true);
+  });
+}
+
+function saveWizardOutline() {
+  var content = el('wizOutline') ? el('wizOutline').value : '';
+  if (!content) { showToast('大纲为空', true); return; }
+  apiPost('/api/outline', {content: content}).then(function(r) {
+    if (r) showToast('大纲已保存');
+  });
+}
+
+function addWizardVolume() {
+  showToast('添加卷功能待实现');
+}
+
+// ── Wizard chat ──
+function sendWizardChat(stepKey) {
+  var input = el('wizChatInput-' + stepKey);
+  if (!input || !input.value.trim()) return;
+  var msg = input.value.trim();
+  input.value = '';
+
+  if (!wizardState.chatHistory[stepKey]) wizardState.chatHistory[stepKey] = [];
+  wizardState.chatHistory[stepKey].push({role: 'user', content: msg});
+
+  var msgsEl = el('wizChat-' + stepKey);
+  if (msgsEl) {
+    msgsEl.innerHTML += '<div class="wiz-chat-msg user">' + escHtml(msg) + '</div>';
+    msgsEl.scrollTop = msgsEl.scrollHeight;
   }
-  if (t.id === 'outlineLoad') {
-    const r = await api('/api/outline'); if (r?.outline) document.getElementById('outlineText').value = r.outline;
+
+  var chatHistory = [];
+  for (var i = 0; i < wizardState.chatHistory[stepKey].length; i++) {
+    chatHistory.push(wizardState.chatHistory[stepKey][i]);
+  }
+  chatHistory.unshift({role: 'system', content: '你是一个专业的网文创作顾问助手。'});
+
+  var aiMsgEl = msgsEl;
+  var aiDiv = document.createElement('div');
+  aiDiv.className = 'wiz-chat-msg ai';
+  aiDiv.textContent = '...';
+  if (aiMsgEl) aiMsgEl.appendChild(aiDiv);
+
+  var full = '';
+  llamaStream(chatHistory, function(token) {
+    full += token;
+    aiDiv.textContent = full;
+    if (aiMsgEl) aiMsgEl.scrollTop = aiMsgEl.scrollHeight;
+  }, function() {
+    wizardState.chatHistory[stepKey].push({role: 'assistant', content: full});
+  }, function(err) {
+    aiDiv.textContent = '错误: ' + err;
+  });
+}
+
+// ── Outline Tab ──
+function switchTab(name, btn) {
+  // Tab buttons
+  var tabs = ['tabOutlineBtn', 'tabForeshadowBtn'];
+  for (var i = 0; i < tabs.length; i++) {
+    var tb = el(tabs[i]);
+    if (tb) tb.classList.remove('active');
+  }
+  if (btn) btn.classList.add('active');
+
+  // Tab content
+  var contents = ['tabOutline', 'tabForeshadow'];
+  for (var i = 0; i < contents.length; i++) {
+    var c = el(contents[i]);
+    if (c) c.classList.remove('active');
+  }
+  var target = name === 'outline' ? 'tabOutline' : 'tabForeshadow';
+  var t = el(target);
+  if (t) t.classList.add('active');
+
+  if (name === 'foreshadow') loadForeshadowStats();
+}
+
+// ── Outline autosave ──
+function onOutlineInput() {
+  clearTimeout(outlineSaveTimer);
+  var st = el('outlineSaveStatus');
+  if (st) st.textContent = '输入中...';
+  outlineSaveTimer = setTimeout(function() {
+    var ta = el('outlineText');
+    if (!ta) return;
+    apiPost('/api/outline', {content: ta.value}).then(function(r) {
+      if (st) st.textContent = r ? '已保存' : '保存失败';
+    });
+  }, 3000);
+}
+
+// ── Generate outline chapter (AI) ──
+function generateOutlineChapter() {
+  var ta = el('outlineText');
+  if (!ta) return;
+  ta.value = '生成中...';
+
+  fetch('/api/outline/generate-chapter', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({volume: parseInt(el('selVolume').value) || 1, chapter: parseInt(el('selChapter').value) || 1})
+  }).then(function(resp) {
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+    var full = '';
+
+    function readChunk() {
+      reader.read().then(function(result) {
+        if (result.done) {
+          if (full) ta.value = full;
+          showToast('细纲生成完成');
+          return;
+        }
+        buffer += decoder.decode(result.value, {stream: true});
+        var lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (!line.startsWith('data: ')) continue;
+          try {
+            var d = JSON.parse(line.slice(6));
+            if (d.type === 'stream' || d.type === 'token') full += d.text || d.token || '';
+            else if (d.type === 'error') showToast('错误: ' + d.msg, true);
+          } catch(e) {}
+        }
+        if (full) ta.value = full;
+        readChunk();
+      }).catch(function(e) {
+        showToast('读取失败: ' + e.message, true);
+      });
+    }
+    readChunk();
+  }).catch(function(e) {
+    showToast('请求失败: ' + e.message, true);
+  });
+}
+
+// ── Foreshadowing ──
+function loadForeshadowStats() {
+  apiGet('/api/foreshadowing').then(function(r) {
+    if (!r) return;
+    el('fsUnresolved').textContent = r.unresolved || r.pending || 0;
+    el('fsResolved').textContent = r.resolved || 0;
+    el('fsTotal').textContent = r.total || 0;
+  });
+}
+
+function generateForeshadow() {
+  apiPost('/api/foreshadowing/generate', {}).then(function(r) {
+    if (r) showToast('伏笔生成完成: ' + (r.count || 0) + '个');
+  });
+}
+
+// ── Inspire modules ──
+function generateHook() {
+  var input = el('hookInput');
+  var out = el('hookOutput');
+  if (!out) return;
+  var genre = el('selGenre') ? el('selGenre').value : '玄幻';
+  var prompt = input && input.value ? input.value : '';
+  out.textContent = '生成中...';
+  llamaStream([
+    {role: 'system', content: '你是一个专业的网文创作顾问，擅长生成章节钩子和开篇创意。当前体裁：' + genre},
+    {role: 'user', content: prompt || '请生成3个吸引人的章节开头钩子，每个50字以内。'}
+  ], function(token) {
+    if (out.textContent === '生成中...') out.textContent = '';
+    out.textContent += token;
+  }, function() {
+    showToast('钩子生成完成');
+  }, function(err) {
+    showToast('生成失败: ' + err, true);
+  });
+}
+
+function generateIdea() {
+  var input = el('ideaInput');
+  var out = el('ideaOutput');
+  if (!out) return;
+  var idea = input ? input.value : '';
+  if (!idea) { showToast('请输入你的想法', true); return; }
+  out.textContent = '展开中...';
+  llamaStream([
+    {role: 'system', content: '你是一个专业的网文创作顾问，擅长展开章节构思为详细细纲。'},
+    {role: 'user', content: '请展开以下章节构思为详细的细纲（300-500字）：\n' + idea}
+  ], function(token) {
+    if (out.textContent === '展开中...') out.textContent = '';
+    out.textContent += token;
+  }, function() {
+    showToast('构思展开完成');
+  }, function(err) {
+    showToast('生成失败: ' + err, true);
+  });
+}
+
+function loadQualityGate() {
+  apiGet('/api/quality-gate').then(function(r) {
+    if (!r) return;
+    var scoreEl = el('qgScore');
+    var detailEl = el('qgDetail');
+    if (scoreEl) scoreEl.textContent = (r.score || r.overall_score || '--') + '分';
+    if (detailEl) detailEl.textContent = r.verdict || r.summary || '无详细信息';
+  });
+}
+
+// ── Inspire Chat ──
+var inspireChatHistory = [];
+function inspireChatSend() {
+  var input = el('inspireChatInput');
+  if (!input || !input.value.trim()) return;
+  var msg = input.value.trim();
+  input.value = '';
+
+  var msgsEl = el('inspireChatMsgs');
+  if (msgsEl) {
+    msgsEl.innerHTML += '<div class="chat-msg user">' + escHtml(msg) + '</div>';
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+
+  inspireChatHistory.push({role: 'user', content: msg});
+
+  var history = [{role: 'system', content: '你是一个专业的网文创作助手，帮助作者构思和优化故事。'}];
+  for (var i = 0; i < inspireChatHistory.length; i++) {
+    history.push(inspireChatHistory[i]);
+  }
+
+  var aiDiv = document.createElement('div');
+  aiDiv.className = 'chat-msg ai';
+  aiDiv.textContent = '...';
+  if (msgsEl) msgsEl.appendChild(aiDiv);
+
+  var full = '';
+  fetch('/api/workshop/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({messages: history})
+  }).then(function(resp) {
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+
+    function readChunk() {
+      reader.read().then(function(result) {
+        if (result.done) {
+          inspireChatHistory.push({role: 'assistant', content: full});
+          return;
+        }
+        buffer += decoder.decode(result.value, {stream: true});
+        var lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (!line.startsWith('data: ')) continue;
+          try {
+            var d = JSON.parse(line.slice(6));
+            var token = d.text || d.token || d.content || '';
+            if (token) full += token;
+          } catch(e) {}
+        }
+        aiDiv.textContent = full;
+        if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+        readChunk();
+      }).catch(function(e) {
+        aiDiv.textContent = '错误: ' + e.message;
+      });
+    }
+    readChunk();
+  }).catch(function(e) {
+    aiDiv.textContent = '请求失败: ' + e.message;
+  });
+}
+
+// ── Actions ──
+function doSaveSnapshot() {
+  apiPost('/api/snapshots', {label: new Date().toLocaleString()}).then(function(r) {
+    if (r && r.ok) showToast('快照已保存');
+    else showToast('快照保存失败', true);
+  });
+}
+
+function doExport() {
+  apiPost('/api/export', {format: 'epub'}).then(function(r) {
+    if (r) showToast('导出成功: ' + (r.path || ''));
+    else showToast('导出失败', true);
+  });
+}
+
+function doAnalyze() {
+  apiGet('/api/analyze').then(function(r) {
+    if (r && r.report) {
+      showToast(r.report.total_chapters + '章 ' + (r.report.total_words || 0).toLocaleString() + '字 ' + ((r.report.pacing_issues || []).length) + '节奏问题');
+    }
+  });
+}
+
+function doContinuity() {
+  apiGet('/api/continuity').then(function(r) {
+    if (r) showToast('检查完成: ' + ((r.findings || r.issues || []).length) + '个发现');
+  });
+}
+
+// ── New Chapter Modal ──
+function showNewChapterModal() {
+  el('newChapterModal').classList.remove('hidden');
+  el('ncVolume').value = el('selVolume').value;
+  el('ncChapter').value = parseInt(el('selChapter').value) + 1;
+}
+
+function hideNewChapterModal() {
+  el('newChapterModal').classList.add('hidden');
+}
+
+function confirmNewChapter() {
+  var vol = parseInt(el('ncVolume').value) || 1;
+  var ch = parseInt(el('ncChapter').value) || 1;
+  el('selVolume').value = vol;
+  el('selChapter').value = ch;
+  hideNewChapterModal();
+  doGenerate();
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    doGenerate();
   }
 });
 
-// ── Actions ──
-async function doSnapshot() { const r = await api('/api/snapshots', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({label:new Date().toLocaleString()})}); if(r?.ok) toast('快照已保存'); rpLog('快照保存'); }
-async function doExport() { const r = await api('/api/export', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({format:'epub'})}); if(r?.ok) toast(`导出: ${r.path}`); }
-async function doAnalyze() { const r = await api('/api/analyze'); if(r?.report) toast(`${r.report.total_chapters}章·${r.report.total_words.toLocaleString()}字·${r.report.pacing_issues?.length||0}节奏问题`); }
-async function doContinuity() { const r = await api('/api/continuity'); if(r) toast(`检查完成: ${r.findings?.length||0}个发现`); }
-async function doDeAI() { const vol=document.getElementById('selVolume')?.value||1; const ch=document.getElementById('selChapter')?.value||1; const r = await api(`/api/deai?volume=${vol}&chapter=${ch}`); if(r) toast(`DeAI: ${r.overall_score||'?'}分`); }
-async function doModelSwitch() { const r = await api('/api/models'); if(r) { const m=prompt('可用模型:\n'+r.models?.join('\n')+'\n\n输入模型名:'); if(m) {await api('/api/models/switch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:m})}); toast('已切换'); refreshStatus(); } } }
-
-// ── Panels ──
-const panels = {
-  write: '<div class="panel panel-write"><div class="inner"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px"><h3 style="margin:0">写作</h3><div style="display:flex;gap:10px;align-items:center;font-size:12px;color:var(--text2)"><span>速度: <b id="writeSpeed">0</b>字/分</span><span>用时: <b id="writeTime">00:00</b></span><span>字数: <b id="writeWords">0</b></span><span>保存: <b id="writeSave" style="color:var(--success)">就绪</b></span><select id="writeFontSize" style="width:55px;font-size:11px" onchange="document.getElementById('writeEditor').style.fontSize=this.value+'px'"><option value="16">16px</option><option value="18" selected>18px</option><option value="20">20px</option></select><button class="btn-secondary btn-sm" onclick="toggleFocus()">专注</button></div></div><textarea id="writeEditor" placeholder="在此写作，或点击上方「生成」让AI帮你写。每30秒自动保存。" style="width:100%;min-height:420px;font-family:var(--font-serif);font-size:18px;line-height:2;padding:28px 36px;border:1px solid var(--border);border-radius:var(--radius);resize:vertical;background:var(--surface);outline:none" oninput="onWriteInput()"></textarea><div class="status-bar" style="margin-top:8px"><span>门控: <b id="writeGate">--</b></span></div></div></div>',
-  dashboard: '<div class="panel"><div class="panel-grid"><div class="card"><h4>总字数</h4><div class="val" id="dashWords">—</div></div><div class="card"><h4>已完成</h4><div class="val" id="dashChapters">—</div></div><div class="card"><h4>角色数</h4><div class="val" id="dashChars">—</div></div><div class="card"><h4>剧情线</h4><div class="val" id="dashThreads">—</div></div><div class="card wide"><h4>质量门控</h4><div id="dashGate">自动加载…</div></div><div class="card wide"><h4>叙事多样性</h4><div id="dashDiversity">自动加载…</div></div></div></div>',
-  outline: '<div class="panel"><h3>大纲管理 · 输入停止5秒自动保存</h3><div class="card"><textarea id="outlineText" style="width:100%;min-height:380px;font-size:13px;font-family:var(--font-mono);border:none;resize:vertical" placeholder="直接编辑，停止输入5秒后自动保存…" oninput="clearTimeout(window._os);window._os=setTimeout(()=>{const v=document.getElementById(\'outlineText\')?.value;if(v!==undefined)api(\'/api/outline\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({content:v})})},5000)"></textarea></div><div style="margin-top:12px"><button class="btn-secondary btn-sm" id="outlineLoad">从服务器加载</button></div></div>',
-  characters: '<div class="panel"><h3>角色管理</h3><div class="card" style="min-height:200px"><div id="charContent">切换到「角色」自动加载…</div></div></div>',
-  world: '<div class="panel"><h3>世界观管理</h3><div class="card" style="min-height:200px"><div id="worldContent">切换到「世界」自动加载…</div></div></div>',
-  audit: '<div class="panel"><div class="panel-grid"><div class="card"><h4>连续性检查</h4><div id="auditCont">自动加载…</div></div><div class="card"><h4>去AI检测</h4><div id="auditDeAI">自动加载…</div></div><div class="card"><h4>质量门控</h4><div id="auditGate">—</div></div><div class="card"><h4>叙事多样性</h4><div id="auditDiv">—</div></div></div></div>',
-  memory: '<div class="panel"><div class="panel-grid"><div class="card"><h4>最近日志</h4><div id="memLogs" style="font-size:11px;font-family:var(--font-mono);max-height:300px;overflow-y:auto">自动加载…</div></div><div class="card"><h4>快照列表</h4><div id="memSnaps">自动加载…</div></div></div></div>',
-  logs: '<div class="panel"><h3>系统日志</h3><div class="card" style="min-height:400px;overflow-y:auto"><div id="logContent" style="font-size:11px;font-family:var(--font-mono)">自动加载…</div></div></div>',
-  settings: '<div class="panel"><h3>设置</h3><div class="card" style="margin-bottom:12px"><h4>写作参数</h4><div style="display:flex;gap:12px;align-items:center"><label>体裁 <select id="cfgGenre"></select></label><label>风格 <select id="cfgStyle"></select></label><label>模式 <select id="cfgMode"><option>quick</option><option>standard</option><option>deep</option></select></label><button class="btn-primary" id="cfgSave" style="margin-left:auto">保存</button></div></div><div class="card"><h4>故事结构</h4><div style="display:flex;gap:12px;align-items:center"><select id="cfgSF" style="flex:1"><option value="">不使用</option><optgroup label="西方经典"><option value="revenge">复仇悲剧</option><option value="rise_to_power">英雄之旅</option></optgroup><optgroup label="中国网文"><option value="fanren">凡人流</option><option value="doupo">废材成帝</option><option value="guimi">克苏鲁</option><option value="dageng">案件驱动</option><option value="xuezhong">群像江湖</option><option value="fuhan">英雄争霸</option><option value="urban">都市逆袭</option></optgroup></select><button class="btn-primary" id="cfgSFApply">应用</button></div></div></div>',
-};
-
 // ── Init ──
-// ── Autosave ──
-let _wt = null; let _wstart = Date.now();
-function onWriteInput() {
-  clearTimeout(_wt);
-  const el = document.getElementById('writeEditor'); if(!el) return;
-  const chars = (el.value.match(/[\u4e00-\u9fff]/g)||[]).length;
-  document.getElementById('writeWords').textContent = chars;
-  const em = Math.max(1, Math.floor((Date.now()-_wstart)/60000));
-  document.getElementById('writeSpeed').textContent = Math.floor(chars/em);
-  const s = Math.floor((Date.now()-_wstart)/1000)%60;
-  document.getElementById('writeTime').textContent = String(Math.floor((Date.now()-_wstart)/60000)).padStart(2,'0')+':'+String(s).padStart(2,'0');
-  _wt = setTimeout(() => {
-    localStorage.setItem('novel_claude_draft', el.value);
-    document.getElementById('writeSave').textContent = '已保存';
-    document.getElementById('writeSave').style.color = 'var(--success)';
+(function init() {
+  loadStoryEngine();
+  loadStatus();
+  loadChapterList();
+  loadQualityGate();
+  loadForeshadowStats();
+
+  // Restore draft from localStorage
+  var draft = localStorage.getItem('novel_claude_draft');
+  if (draft) {
+    var ta = el('editorTextarea');
+    if (ta) {
+      ta.value = draft;
+      updateWordCount();
+    }
+  }
+
+  // Timer: refresh status every 15s
+  setInterval(function() {
+    loadStatus();
+  }, 15000);
+
+  // Timer: editor autosave check (for external changes)
+  setInterval(function() {
+    if (document.hasFocus()) return;
+    var ta = el('editorTextarea');
+    if (ta && ta.value) {
+      localStorage.setItem('novel_claude_draft', ta.value);
+    }
   }, 30000);
-}
-function toggleFocus() {
-  document.querySelector('.layout').classList.toggle('focus-mode');
-  document.querySelector('.toolbar').classList.toggle('tab-hidden');
-}
-const draft = localStorage.getItem('novel_claude_draft');
-if (draft) { setTimeout(() => { const el = document.getElementById('writeEditor'); if(el) { el.value = draft; onWriteInput(); } }, 800); }
-showTab('write');
+
+  // Wire outline textarea autosave
+  var outlineTa = el('outlineText');
+  if (outlineTa) {
+    outlineTa.addEventListener('input', onOutlineInput);
+    // Load outline content
+    apiGet('/api/outline').then(function(r) {
+      if (r && r.outline) outlineTa.value = r.outline;
+    });
+  }
+
+  logMsg('就绪');
+})();
 </script>
 </body>
 </html>
