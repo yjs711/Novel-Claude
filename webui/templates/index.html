@@ -1144,8 +1144,7 @@ function doPause() {
   showToast('已暂停生成');
 }
 
-// ── doRewrite ──
-// ── doRewrite (toolbar) → 聚焦AI改写栏 ──
+// ── doRewrite (toolbar) → 聚焦AI改写模块 ──
 function doRewrite() {
   var bar = el('rewriteBar'); if (bar && bar.style.display === 'none') bar.style.display = 'flex';
   var inp = el('rewritePrompt'); if (inp) { inp.focus(); inp.select(); }
@@ -1168,8 +1167,8 @@ function doRewriteExec() {
   if (!promptText) { showToast('请输入改写要求', true); if (rp) rp.focus(); return; }
 
   var out = el('rewriteOutput'); var st = el('rewriteStatus');
-  if (out) { out.style.display = 'block'; out.textContent = '改写中...\\n'; }
-  if (st) { st.textContent = '正在调用模型...'; st.style.color = 'var(--text2)'; }
+  if (out) { out.style.display = ''; out.textContent = ''; }
+  if (st) { st.textContent = '改写中...'; st.style.color = 'var(--text2)'; }
   el('btnRewriteCancel').style.display = '';
 
   var ac = new AbortController(); _rewriteAbort = ac;
@@ -1196,6 +1195,7 @@ function doRewriteExec() {
           var line = lines[i]; if (line.startsWith(': ')) continue;
           if (!line.startsWith('data: ')) continue;
           try { var d = JSON.parse(line.slice(6));
+            if (d.status && st) { st.textContent = d.status; }
             if (d.text) { rewritten += d.text; if (out) out.textContent = rewritten; }
             if (d.error && st) { st.textContent = '错误: ' + d.error; st.style.color = 'var(--danger)'; }
           } catch(e) {}
@@ -1908,13 +1908,22 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ── Init ──
+// 串行加载：关键数据先加载，其余延迟 300ms 分批加载，避免 6 个请求同时竞争
 (function init() {
-  loadStoryEngine();
-  loadModels();
+  // 第一批：状态 + 模型（首屏必需，串行确保缓存命中）
   loadStatus();
-  loadChapterList();
-  loadQualityGate();
-  loadForeshadowStats();
+  loadModels();
+
+  // 第二批：延迟加载非关键面板
+  setTimeout(function() {
+    loadStoryEngine();
+    loadChapterList();
+  }, 300);
+
+  setTimeout(function() {
+    loadQualityGate();
+    loadForeshadowStats();
+  }, 600);
 
   // Restore draft from localStorage
   var draft = localStorage.getItem('novel_claude_draft');
@@ -2225,11 +2234,6 @@ function renderAnalysisResult(r) {
 
   out.innerHTML = html;
 }
-
-
-// ── doRewriteExec (AI改写模块) ──
-var _rewriteAbort = null;
-
 
 </script>
 </body>

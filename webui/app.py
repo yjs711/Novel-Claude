@@ -899,12 +899,27 @@ async def revise_file(request: Request):
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
+# ── model cache ──────────────────────────────────────────────────────────
+_models_cache: dict = {}
+_models_cache_ts: float = 0.0
+_MODELS_CACHE_TTL: float = 30.0  # 30 秒内不重复扫描端口
+
+
 # ── model discovery & switching ──────────────────────────────────────────
 
 @app.get("/api/models")
 async def discover_models():
     """Auto-discover all loaded models by scanning configured LM Studio ports.
-    Calls /v1/models on each port, matches against config alt_models keys."""
+    Calls /v1/models on each port, matches against config alt_models keys.
+    结果缓存 30 秒，避免每次打开页面都扫描端口。"""
+    global _models_cache, _models_cache_ts
+    import time as _time
+    now = _time.time()
+
+    # 缓存命中：直接返回
+    if _models_cache and (now - _models_cache_ts) < _MODELS_CACHE_TTL:
+        return _models_cache
+
     import httpx
     cfg = load_cfg()
     scan_ports = cfg.get("llm", {}).get("scan_ports", [61183])
@@ -917,7 +932,7 @@ async def discover_models():
 
     for port in scan_ports:
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=1.5) as client:
                 resp = await client.get(f"http://127.0.0.1:{port}/v1/models")
                 if resp.status_code == 200:
                     data = resp.json()
@@ -968,7 +983,11 @@ async def discover_models():
         active_default = list(models.keys())[0] if models else ""
 
     task_models = cfg.get("llm", {}).get("task_models", {})
-    return {"models": models, "default": active_default, "task_models": task_models}
+    result = {"models": models, "default": active_default, "task_models": task_models}
+    # 写入缓存
+    _models_cache = result
+    _models_cache_ts = now
+    return result
 
 def _model_key_from_id(model_id: str, port: int) -> str:
     """Derive a short key from a model ID, preferring config alt_models match."""
@@ -1625,12 +1644,12 @@ async def read_chapter_file(vol: str = "", num: int = 0):
         "vol": vol, "number": num,
     }
 
-# ── deAI rewrite (AI-driven de-AI-ification) ────────────────────────────
+# ── 通用改写（去AI味 + 自定义要求） ────────────────────────────
 
 @app.post("/api/deai-rewrite")
 async def deai_rewrite(request: Request):
-    """AI rewrites chapter to remove AI-sounding patterns. SSE streaming.
-    Uses the currently selected model with specific de-AI instructions."""
+    """AI rewrites selected text. When prompt is empty, defaults to de-AI rewrite.
+    Otherwise user's instruction takes priority, de-AI analysis runs as reference."""
     data = await request.json()
     chapter_num = data.get("chapter", 1)
     content = data.get("content", "")
@@ -1672,21 +1691,45 @@ async def deai_rewrite(request: Request):
         issues.append(issue)
 
     issues_text = "\n".join(f"- {i}" for i in issues[:12]) if issues else "无显著问题"
+    has_issues = len(issues) > 0
 
     from utils.llm_client import get_task_client, get_task_model, _llm_temperature, _llm_frequency_penalty, _llm_presence_penalty, _llm_top_p
     client = get_task_client("writing")
     model = get_task_model("writing")
 
-    # 用户自定义改写指令
-    user_instruction = ""
-    if user_prompt:
-        user_instruction = f"""
-
-**作者特别要求**：{user_prompt}
-请优先满足作者的改写要求，同时兼顾上述去AI味原则。"""
-
     from utils.prompt_loader import polishing_prompt
-    system_prompt = polishing_prompt() + f"""
+
+    # ── 根据是否有用户 prompt 决定主任务 ──
+    if user_prompt:
+        # 用户自定义改写为主
+        task_header = f"**当前任务：按作者要求改写文本**"
+        user_section = f"""
+**改写要求**：{user_prompt}
+请优先满足此要求，这是本次改写的核心目标。"""
+        deai_section = ""
+        if has_issues:
+            deai_section = f"""
+
+**文本质检参考（非必需，如有帮助可参考）**：
+{issues_text}
+
+去AI味技巧（在满足改写要求的前提下酌情使用）：
+- 删除AI高频词（不禁/缓缓/微微/顿时/忽然/仿佛/某种 等）
+- 打破模板句式（嘴角上扬/心中一震/深吸一口气 等）
+- 动作留白：只保留关键帧
+- 情绪不直说，用动作和环境呈现"""
+
+        system_prompt = polishing_prompt() + f"""
+{task_header}
+{user_section}
+{deai_section}
+
+输出原则：
+- 保持原文剧情走向
+- 只输出改写后的选中文本，不要解释"""
+    else:
+        # 默认：纯去AI味改写
+        system_prompt = polishing_prompt() + f"""
 
 **当前任务：去AI味改写**
 
@@ -1700,11 +1743,12 @@ async def deai_rewrite(request: Request):
 4. 感官侵入：多写触觉/嗅觉/温度，少用视觉描述
 5. 对话必须有意推进，每轮承载事实/规矩/代价之一
 6. 情绪不直说，用动作和环境呈现
-7. 保持原文剧情走向，直接输出改写后的完整正文
-{user_instruction}"""
+7. 保持原文剧情走向，直接输出改写后的完整正文"""
 
     async def generate():
         try:
+            mode = "按用户要求改写" if user_prompt else "去AI味改写"
+            yield f"data: {json.dumps({'status': f'检测完成（发现 {len(issues)} 个AI特征）。{mode}，调用 {model}...'}, ensure_ascii=False)}\n\n"
             temp = _llm_temperature("deai")
             freq = _llm_frequency_penalty("deai")
             pres = _llm_presence_penalty("deai")
