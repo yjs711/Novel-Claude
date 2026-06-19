@@ -150,6 +150,13 @@ function showTab(name) {
   const content = document.getElementById('mainContent');
   content.innerHTML = panels[name] || panels['write'];
   if (name === 'dashboard') loadDashboard();
+    if (name === 'characters') loadCharacters();
+    if (name === 'world') loadWorld();
+    if (name === 'audit') loadAudit();
+    if (name === 'memory') loadMemory();
+    if (name === 'logs') loadLogs();
+    if (name === 'settings') loadSettings();
+    if (name === 'outline') { setTimeout(async () => { const r = await api('/api/outline'); if (r?.outline) document.getElementById('outlineText').value = r.outline; }, 100); }
   if (name === 'characters') loadCharacters();
   if (name === 'world') loadWorld();
   if (name === 'audit') loadAudit();
@@ -335,42 +342,42 @@ async function loadMemory() {
 
 // ── Logs ──
 async function loadLogs() {
-  const r = await api('/api/logs?lines=50');
-  if (!r?.available) { document.getElementById('mainContent').innerHTML = '<h3>日志</h3><p>无日志文件</p>'; return; }
-  let html = `<h3>日志 (${r.total_lines}行, ${r.size_kb}KB)</h3>`;
-  html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;max-height:500px;overflow-y:auto;font-family:monospace;font-size:11px">';
-  html += r.lines.map(l => `<div>${l}</div>`).join('');
-  html += '</div>';
-  document.getElementById('mainContent').innerHTML = html;
+  document.getElementById('mainContent').innerHTML = panels['logs'];
+  const r = await api('/api/logs?lines=60');
+  if (r?.available) { document.getElementById('logContent').textContent = r.lines.join('\n'); }
+  else { document.getElementById('logContent').textContent = '无日志文件'; }
 }
 
 // ── Settings ──
 async function loadSettings() {
+  document.getElementById('mainContent').innerHTML = panels['settings'];
   const r = await api('/api/config'); if (!r) return;
-  let html = '<h3>设置</h3>';
-  html += '<div class="card" style="margin-bottom:8px"><h4>写作参数</h4>';
-  html += `<label>体裁 <select id="cfgGenre">${(r.genres||['修仙']).map(g=>`<option>${g}</option>`).join('')}</select></label> `;
-  html += `<label>风格 <select id="cfgStyle">${(r.styles||['网文爽文']).map(s=>`<option>${s}</option>`).join('')}</select></label> `;
-  html += `<label>模式 <select id="cfgMode"><option>quick</option><option>standard</option><option>deep</option></select></label>`;
-  html += `<button class="btn-primary btn-sm" style="margin-left:8px" onclick="saveCfg()">保存</button></div>`;
-  html += '<div class="card" style="margin-bottom:8px"><h4>故事结构</h4>';
-  html += `<select id="cfgSF"><option value="">无</option><optgroup label="西方经典"><option value="revenge">复仇悲剧</option><option value="rise_to_power">英雄之旅</option></optgroup><optgroup label="中国网文"><option value="fanren">凡人流</option><option value="doupo">废材成帝</option><option value="guimi">克苏鲁</option><option value="dageng">案件驱动</option><option value="xuezhong">群像江湖</option><option value="fuhan">英雄争霸</option><option value="urban">都市逆袭</option></optgroup></select>`;
-  html += `<button class="btn-primary btn-sm" style="margin-left:8px" onclick="saveSF()">应用</button></div>`;
-  html += '<div class="card"><h4>模型</h4>';
-  html += `<div class="rp-row"><span>连接</span><span>${r.provider||'?'} · ${r.model||'?'}</span></div>`;
-  html += `<button class="btn-secondary btn-sm" onclick="doModelSwitch()">切换模型</button></div>`;
-  document.getElementById('mainContent').innerHTML = html;
+  const sg = document.getElementById('cfgGenre');
+  if (sg) { sg.innerHTML = (r.genres||['修仙']).map(g=>`<option>${g}</option>`).join(''); }
+  const ss = document.getElementById('cfgStyle');
+  if (ss) { ss.innerHTML = (r.styles||['网文爽文']).map(s=>`<option>${s}</option>`).join(''); }
 }
-async function saveCfg() {
-  await api('/api/config', {method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({genre:document.getElementById('cfgGenre').value, style:document.getElementById('cfgStyle').value, workflow:{mode:document.getElementById('cfgMode').value}})});
-  toast('设置已保存'); refreshStatus();
-}
-async function saveSF() {
-  const t = document.getElementById('cfgSF').value; if(!t) return;
-  await api('/api/storyform', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({template:t})});
-  toast('故事结构已应用');
-}
+
+// ── Event Delegation ──
+document.addEventListener('click', async e => {
+  const t = e.target;
+  if (t.id === 'cfgSave') {
+    const g = document.getElementById('cfgGenre')?.value; const s = document.getElementById('cfgStyle')?.value;
+    const m = document.getElementById('cfgMode')?.value||'quick';
+    if (g) { await api('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({genre:g, style:s, workflow:{mode:m}})}); toast('已保存'); refreshStatus(); }
+  }
+  if (t.id === 'cfgSFApply') {
+    const v = document.getElementById('cfgSF')?.value; if(!v) return;
+    await api('/api/storyform', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({template:v})}); toast('已应用');
+  }
+  if (t.id === 'outlineSave') {
+    const v = document.getElementById('outlineText')?.value;
+    if (v) { await api('/api/outline', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content:v})}); toast('大纲已保存'); }
+  }
+  if (t.id === 'outlineLoad') {
+    const r = await api('/api/outline'); if (r?.outline) document.getElementById('outlineText').value = r.outline;
+  }
+});
 
 // ── Actions ──
 async function doSnapshot() { const r = await api('/api/snapshots', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({label:new Date().toLocaleString()})}); if(r?.ok) toast('快照已保存'); rpLog('快照保存'); }
@@ -382,28 +389,16 @@ async function doModelSwitch() { const r = await api('/api/models'); if(r) { con
 
 // ── Panels ──
 const panels = {
-  write: `<div class="panel panel-write"><div class="inner"><h3>写作</h3><div class="output" id="writeOutput">点击"生成"开始创作…</div><div class="status-bar"><span>字数: <b id="writeWords">0</b></span><span>门控: <b id="writeGate">--</b></span></div></div></div>`,
-  dashboard: `<div class="panel"><h3>总览</h3><div class="panel-grid"><div class="card"><h4>总字数</h4><div class="val" id="dashWords">0</div></div><div class="card"><h4>已完成</h4><div class="val" id="dashChapters">0</div></div><div class="card"><h4>角色</h4><div class="val" id="dashChars">0</div></div><div class="card"><h4>剧情线</h4><div class="val" id="dashThreads">0</div></div><div class="card wide"><h4>质量门控</h4><div id="dashGate">--</div></div><div class="card wide"><h4>叙事多样性</h4><div id="dashDiversity">--</div></div></div></div>`,
-  outline: `<div class="panel"><h3>大纲管理</h3><textarea id="outlineText" style="width:100%;min-height:300px;font-family:monospace" placeholder="加载中…"></textarea><div style="margin-top:8px;display:flex;gap:8px"><button class="btn-primary btn-sm" id="outlineSave">保存</button><button class="btn-secondary btn-sm" id="outlineLoad">加载</button></div></div>`,
-  characters: `<div class="panel"><h3>角色管理</h3><p>加载中…</p></div>`,
-  world: `<div class="panel"><h3>世界观管理</h3><p>加载中…</p></div>`,
-  audit: `<div class="panel"><h3>审阅面板</h3><p>加载中…</p></div>`,
-  memory: `<div class="panel"><h3>记忆面板</h3><p>加载中…</p></div>`,
-  logs: `<div class="panel"><h3>日志</h3><p>加载中…</p></div>`,
-  settings: `<div class="panel"><h3>设置</h3><p>加载中…</p></div>`,
+  write: '<div class="panel panel-write"><div class="inner"><div class="output" id="writeOutput">点击「生成」开始创作…</div><div class="status-bar"><span>字数: <b id="writeWords">0</b></span><span>门控: <b id="writeGate">--</b></span></div></div></div>',
+  dashboard: '<div class="panel"><div class="panel-grid"><div class="card"><h4>总字数</h4><div class="val" id="dashWords">—</div></div><div class="card"><h4>已完成</h4><div class="val" id="dashChapters">—</div></div><div class="card"><h4>角色数</h4><div class="val" id="dashChars">—</div></div><div class="card"><h4>剧情线</h4><div class="val" id="dashThreads">—</div></div><div class="card wide"><h4>质量门控</h4><div id="dashGate">自动加载…</div></div><div class="card wide"><h4>叙事多样性</h4><div id="dashDiversity">自动加载…</div></div></div></div>',
+  outline: '<div class="panel"><h3>大纲管理</h3><div class="card"><textarea id="outlineText" style="width:100%;min-height:380px;font-size:13px;font-family:var(--font-mono);border:none;resize:vertical" placeholder="点击下方「加载大纲」按钮…"></textarea></div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn-primary btn-sm" id="outlineSave">保存大纲</button><button class="btn-secondary btn-sm" id="outlineLoad">加载大纲</button></div></div>',
+  characters: '<div class="panel"><h3>角色管理</h3><div class="card" style="min-height:200px"><div id="charContent">切换到「角色」自动加载…</div></div></div>',
+  world: '<div class="panel"><h3>世界观管理</h3><div class="card" style="min-height:200px"><div id="worldContent">切换到「世界」自动加载…</div></div></div>',
+  audit: '<div class="panel"><div class="panel-grid"><div class="card"><h4>连续性检查</h4><div id="auditCont">自动加载…</div></div><div class="card"><h4>去AI检测</h4><div id="auditDeAI">自动加载…</div></div><div class="card"><h4>质量门控</h4><div id="auditGate">—</div></div><div class="card"><h4>叙事多样性</h4><div id="auditDiv">—</div></div></div></div>',
+  memory: '<div class="panel"><div class="panel-grid"><div class="card"><h4>最近日志</h4><div id="memLogs" style="font-size:11px;font-family:var(--font-mono);max-height:300px;overflow-y:auto">自动加载…</div></div><div class="card"><h4>快照列表</h4><div id="memSnaps">自动加载…</div></div></div></div>',
+  logs: '<div class="panel"><h3>系统日志</h3><div class="card" style="min-height:400px;overflow-y:auto"><div id="logContent" style="font-size:11px;font-family:var(--font-mono)">自动加载…</div></div></div>',
+  settings: '<div class="panel"><h3>设置</h3><div class="card" style="margin-bottom:12px"><h4>写作参数</h4><div style="display:flex;gap:12px;align-items:center"><label>体裁 <select id="cfgGenre"></select></label><label>风格 <select id="cfgStyle"></select></label><label>模式 <select id="cfgMode"><option>quick</option><option>standard</option><option>deep</option></select></label><button class="btn-primary" id="cfgSave" style="margin-left:auto">保存</button></div></div><div class="card"><h4>故事结构</h4><div style="display:flex;gap:12px;align-items:center"><select id="cfgSF" style="flex:1"><option value="">不使用</option><optgroup label="西方经典"><option value="revenge">复仇悲剧</option><option value="rise_to_power">英雄之旅</option></optgroup><optgroup label="中国网文"><option value="fanren">凡人流</option><option value="doupo">废材成帝</option><option value="guimi">克苏鲁</option><option value="dageng">案件驱动</option><option value="xuezhong">群像江湖</option><option value="fuhan">英雄争霸</option><option value="urban">都市逆袭</option></optgroup></select><button class="btn-primary" id="cfgSFApply">应用</button></div></div></div>',
 };
-
-// ── Outline handlers ──
-document.addEventListener('click', async (e) => {
-  if (e.target.id === 'outlineSave') {
-    const text = document.getElementById('outlineText')?.value;
-    if (text) { await api('/api/outline', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content:text})}); toast('大纲已保存'); }
-  }
-  if (e.target.id === 'outlineLoad') {
-    const r = await api('/api/outline');
-    if (r?.outline) { document.getElementById('outlineText').value = r.outline; }
-  }
-});
 
 // ── Init ──
 showTab('write');
