@@ -751,11 +751,14 @@ async function streamSSE(url, opts, onToken, onDone, onError, onStatus) {
 
 // ── llamaStream ──
 function llamaStream(messages, onToken, onDone, onError, signal) {
+  // 使用当前选中的模型，而非硬编码
+  var modelSelect = el('selModel');
+  var model = (modelSelect && modelSelect.value) ? modelSelect.value : 'qwen3.6-27b-uncensored';
   return streamSSE('http://localhost:61183/v1/chat/completions', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      model: 'qwen3.6-27b-uncensored',
+      model: model,
       messages: messages,
       stream: true,
       chat_template_kwargs: {enable_thinking: false}
@@ -1453,8 +1456,9 @@ function generateOutline() {
 function saveWizardOutline() {
   var content = el('wizOutline') ? el('wizOutline').value : '';
   if (!content) { showToast('大纲为空', true); return; }
-  apiPost('/api/outline', {content: content}).then(function(r) {
-    if (r) showToast('大纲已保存');
+  apiPost('/api/files/write', {name: '大纲.md', content: content}).then(function(r) {
+    if (r && r.ok) showToast('大纲已保存到项目');
+    else showToast('保存失败', true);
   });
 }
 
@@ -1479,9 +1483,9 @@ function saveWizardAsset(type) {
 }
 
 function addWizardVolume() {
-  var volNum = (wizardState.data.outline ? 2 : 1);
+  var volNum = (wizardState.data.outline && wizardState.data.outline.outline ? 2 : 1);
   var title = '第' + volNum + '卷';
-  apiPost('/api/outline/add-volume', {title: title, description: '新卷'}).then(function(r) {
+  apiPost('/api/outline/add-volume', {name: title, chapter_count: 100}).then(function(r) {
     if (r && r.ok) showToast('已添加: ' + title);
     else showToast('添加卷失败', true);
   }).catch(function() { showToast('添加卷失败', true); });
@@ -1558,8 +1562,8 @@ function onOutlineInput() {
   outlineSaveTimer = setTimeout(function() {
     var ta = el('outlineText');
     if (!ta) return;
-    apiPost('/api/outline', {content: ta.value}).then(function(r) {
-      if (st) st.textContent = r ? '已保存' : '保存失败';
+    apiPost('/api/files/write', {name: '细纲.md', content: ta.value}).then(function(r) {
+      if (st) st.textContent = (r && r.ok) ? '已保存' : '保存失败';
     });
   }, 3000);
 }
@@ -1615,15 +1619,23 @@ function generateOutlineChapter() {
 function loadForeshadowStats() {
   apiGet('/api/foreshadowing').then(function(r) {
     if (!r) return;
-    el('fsUnresolved').textContent = r.unresolved || r.pending || 0;
-    el('fsResolved').textContent = r.resolved || 0;
-    el('fsTotal').textContent = r.total || 0;
+    var stats = r.stats || {};
+    var fsUn = el('fsUnresolved');
+    var fsRe = el('fsResolved');
+    var fsTo = el('fsTotal');
+    if (fsUn) fsUn.textContent = stats.planted || 0;
+    if (fsRe) fsRe.textContent = stats.resolved || 0;
+    if (fsTo) fsTo.textContent = stats.total || 0;
   });
 }
 
 function generateForeshadow() {
-  apiPost('/api/foreshadowing/generate', {}).then(function(r) {
-    if (r) showToast('伏笔生成完成: ' + (r.count || 0) + '个');
+  var ch = parseInt(el('selChapter').value) || 1;
+  var content = el('editorTextarea') ? el('editorTextarea').value : '';
+  if (!content) { showToast('请先生成或加载章节内容', true); return; }
+  apiPost('/api/foreshadowing/generate', {chapter: ch, content: content}).then(function(r) {
+    if (r && r.ok) showToast('伏笔检测完成: ' + (r.found || 0) + '个');
+    else showToast('伏笔生成失败: ' + ((r && r.error) || '未知错误'), true);
   });
 }
 
