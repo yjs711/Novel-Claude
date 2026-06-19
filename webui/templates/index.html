@@ -65,9 +65,10 @@ textarea { resize: vertical; }
 /* Left panel */
 .panel-left { width: var(--panel-left); border-right: 1px solid var(--border); flex-shrink: 0; }
 .panel-left.collapsed { width: 42px; }
+.panel-left.collapsed .panel-header { flex-direction: column; justify-content: flex-start; padding: 8px 6px; }
 .panel-left.collapsed .panel-body { display: none; }
 .panel-left.collapsed .panel-header-title { writing-mode: vertical-lr; font-size: 11px; padding: 4px 0; }
-.panel-left.collapsed .panel-toggle { display: none; }
+.panel-left.collapsed .panel-toggle { margin-left: 0; margin-top: auto; font-size: 16px; }
 
 /* Write panel */
 .panel-write { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -75,9 +76,10 @@ textarea { resize: vertical; }
 /* Right panels */
 .panel-right { width: var(--panel-right); border-left: 1px solid var(--border); flex-shrink: 0; }
 .panel-right.collapsed { width: 42px; }
+.panel-right.collapsed .panel-header { flex-direction: column; justify-content: flex-start; padding: 8px 6px; }
 .panel-right.collapsed .panel-body { display: none; }
 .panel-right.collapsed .panel-header-title { writing-mode: vertical-lr; font-size: 11px; padding: 4px 0; }
-.panel-right.collapsed .panel-toggle { display: none; }
+.panel-right.collapsed .panel-toggle { margin-left: 0; margin-top: auto; font-size: 16px; }
 
 /* Toolbar */
 .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; font-size: 13px; }
@@ -344,6 +346,7 @@ textarea { resize: vertical; }
             <div contenteditable="true" id="wizWorldOutput" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;min-height:80px;font-size:13px;line-height:1.6"></div>
           </div>
           <button class="btn-primary btn-sm" onclick="generateWorldSetting()">AI生成世界观</button>
+          <button class="btn-secondary btn-sm" onclick="saveWizardAsset('world')" style="margin-left:6px">保存到项目</button>
           <div class="wizard-ai-discuss" style="margin-top:12px">
             <div class="ai-header" onclick="this.nextElementSibling.classList.toggle('open')">&#128172; 与AI讨论</div>
             <div class="ai-body">
@@ -362,6 +365,7 @@ textarea { resize: vertical; }
             <div contenteditable="true" id="wizPowerOutput" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;min-height:80px;font-size:13px;line-height:1.6"></div>
           </div>
           <button class="btn-primary btn-sm" onclick="generatePowerSystem()">AI生成力量体系</button>
+          <button class="btn-secondary btn-sm" onclick="saveWizardAsset('power')" style="margin-left:6px">保存到项目</button>
           <div class="wizard-ai-discuss" style="margin-top:12px">
             <div class="ai-header" onclick="this.nextElementSibling.classList.toggle('open')">&#128172; 与AI讨论</div>
             <div class="ai-body">
@@ -380,6 +384,7 @@ textarea { resize: vertical; }
             <div contenteditable="true" id="wizCharOutput" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;min-height:80px;font-size:13px;line-height:1.6"></div>
           </div>
           <button class="btn-primary btn-sm" onclick="generateProtagonist()">AI生成主角</button>
+          <button class="btn-secondary btn-sm" onclick="saveWizardAsset('character')" style="margin-left:6px">保存到项目</button>
           <div class="wiz-field" style="margin-top:12px">
             <label>添加配角</label>
             <div style="display:flex;gap:6px">
@@ -1231,8 +1236,33 @@ function saveWizardOutline() {
   });
 }
 
+function saveWizardAsset(type) {
+  var content = '';
+  var filename = '';
+  if (type === 'world') {
+    content = el('wizWorldOutput') ? el('wizWorldOutput').textContent.trim() : '';
+    filename = '设定/世界规则.md';
+  } else if (type === 'power') {
+    content = el('wizPowerOutput') ? el('wizPowerOutput').textContent.trim() : '';
+    filename = '设定/修炼体系.md';
+  } else if (type === 'character') {
+    content = el('wizCharOutput') ? el('wizCharOutput').textContent.trim() : '';
+    filename = '人物/主角.md';
+  }
+  if (!content) { showToast('内容为空，先生成再保存', true); return; }
+  apiPost('/api/files/write', {name: filename, content: content}).then(function(r) {
+    if (r && r.ok) showToast('已保存: ' + filename);
+    else showToast('保存失败', true);
+  }).catch(function() { showToast('保存失败', true); });
+}
+
 function addWizardVolume() {
-  showToast('添加卷功能待实现');
+  var volNum = (wizardState.data.outline ? 2 : 1);
+  var title = '第' + volNum + '卷';
+  apiPost('/api/outline/add-volume', {title: title, description: '新卷'}).then(function(r) {
+    if (r && r.ok) showToast('已添加: ' + title);
+    else showToast('添加卷失败', true);
+  }).catch(function() { showToast('添加卷失败', true); });
 }
 
 // ── Wizard chat ──
