@@ -15,7 +15,9 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-app = FastAPI(title="Novel-Claude Fusion v3")
+VERSION = "v0.0"
+
+app = FastAPI(title=f"Novel-Claude Fusion {VERSION}")
 
 # ── Logging: configure ONCE ──
 from utils.logger import setup_logging, get_logger, log_step
@@ -214,7 +216,8 @@ async def status():
     sp = Path(f".novel_{novel_dir}" if novel_dir else ".novel") / "story_state.json"
 
     pi = get_provider_info()
-    result = {"connected": True, "provider": pi["provider"],
+    result = {"connected": True, "version": VERSION,
+              "provider": pi["provider"],
               "model": pi["model"], "novel_name": novel_dir}
 
     if sp.exists():

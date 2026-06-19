@@ -741,6 +741,9 @@ function loadStatus() {
     renderChapterList(r);
     updateGateInfo(r);
     logMsg(r.connected ? '在线' : '离线');
+    // 版本号
+    var vs = el('tbStatus');
+    if (vs && r.version) vs.textContent = r.version;
   });
 }
 
