@@ -2,48 +2,41 @@
   "llm": {
     "provider": "lmstudio",
     "model": "auto",
-    "base_url": "http://localhost:1234/v1",
+    "base_url": "http://localhost:61183/v1",
+    "timeout": 600,
     "api_key": "lm-studio-no-auth-needed",
     "flash_model": "auto",
     "context_length": 256000,
     "scan_ports": [
-      1234
+      61183
     ],
     "alt_models": {
-      "qwen3.6": {
-        "base_url": "http://localhost:1234/v1",
-        "label": "Qwen3.6 大纲策划"
+      "qwen3.6-35b-opus-reasoning": {
+        "base_url": "http://localhost:58909/v1",
+        "purpose": "planning",
+        "label_hint": "Opus 35B — 大纲/世界观/力量体系/角色设定"
       },
-      "gemma4": {
-        "base_url": "http://localhost:1234/v1",
-        "label": "Gemma4 正文执笔"
+      "qwen3.6-27b-uncensored": {
+        "base_url": "http://localhost:58912/v1",
+        "purpose": "writing",
+        "label_hint": "Huihui 27B MTP — 精品章节执笔"
       },
-      "coder_next": {
-        "base_url": "http://localhost:1234/v1",
-        "label": "Coder-Next 推理"
-      },
-      "qwen3-coder-30b": {
-        "base_url": "http://localhost:1234/v1",
-        "label": "Coder-30B 编程"
-      },
-      "gpt-oss-120b": {
-        "base_url": "http://localhost:1234/v1",
-        "label": "GPT-OSS 超大杯"
-      },
-      "qwen3.6-uncensored-aggressive": {
-        "base_url": "http://localhost:1234/v1",
-        "label": "Qwen3.6 激进无审查"
+      "qwen3.6-27b-ud": {
+        "base_url": "http://localhost:58915/v1",
+        "purpose": "writing",
+        "label_hint": "27B UD-Q8_K_XL MTP — 高质量正文/润色"
       }
     },
-    "default_model": "qwen3.6",
+    "default_model": "qwen3.6-27b-uncensored",
     "task_models": {
-      "planning": "qwen3.6",
-      "writing": "gemma4",
-      "reasoning": "coder_next"
+      "planning": "qwen3.6-27b-uncensored",
+      "writing": "qwen3.6-27b-uncensored",
+      "reasoning": "qwen3.6-27b-uncensored",
+      "deai": "qwen3.6-27b-uncensored"
     }
   },
   "workspace": {
-    "novel_name": ""
+    "novel_name": "test_xiuzhen"
   },
   "writing": {
     "target_word_count": 5000,
@@ -61,15 +54,45 @@
   },
   "generation": {
     "temperature": 0.85,
+    "temperature_planning": 0.6,
+    "temperature_writing": 0.9,
+    "temperature_reasoning": 0.5,
+    "temperature_deai": 0.7,
+    "frequency_penalty": 0.25,
+    "frequency_penalty_writing": 0.25,
+    "frequency_penalty_deai": 0.4,
+    "frequency_penalty_planning": 0.2,
+    "frequency_penalty_reasoning": 0.2,
+    "presence_penalty": 0.4,
+    "presence_penalty_writing": 0.4,
+    "presence_penalty_deai": 0.5,
+    "presence_penalty_planning": 0.1,
+    "presence_penalty_reasoning": 0.1,
+    "top_p": 0.95,
+    "top_p_writing": 0.95,
+    "top_p_deai": 0.92,
+    "top_p_planning": 0.9,
+    "top_p_reasoning": 0.85,
+    "max_tokens": 4096,
     "max_retries": 3,
-    "timeout": 180,
+    "timeout": 300,
     "retry_delay": 5
   },
-  "workflow": {
-    "mode": "quick"
+  "quality_gate": {
+    "enabled": true,
+    "pass_threshold": 70,
+    "rewrite_min": 40,
+    "max_rewrite_rounds": 3,
+    "editor_review_enabled": true,
+    "continuity_weight": 0.25,
+    "deai_weight": 0.25,
+    "editor_weight": 0.30
   },
-  "genre": "玄幻",
-  "style": "古龙风格",
+  "workflow": {
+    "mode": "standard"
+  },
+  "genre": "修仙",
+  "style": "网文爽文",
   "context_256k": {
     "full_text_chapters": 3,
     "detail_summary_chapters": 50,

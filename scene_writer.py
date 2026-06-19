@@ -294,12 +294,17 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
     return "\n".join(prompt_parts)
 
 
-def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None) -> str:
+def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None,
+                              rewrite_guidance: str = None) -> str:
     """
     Generate chapter content from chapter outline using @DSL context injection.
     Supports progressive saving via state_manager.
+    If rewrite_guidance is provided, injects it as quality gate feedback.
     """
-    print(f"\n[INFO] 正在生成第 {volume_id} 卷第 {chapter_id} 章...")
+    if rewrite_guidance:
+        print(f"\n[REWRITE] 第 {volume_id} 卷第 {chapter_id} 章 — 质量门控重写 (guidance: {rewrite_guidance[:80]}...)")
+    else:
+        print(f"\n[INFO] 正在生成第 {volume_id} 卷第 {chapter_id} 章...")
 
     # Load chapter outline
     outline = load_chapter_outline(volume_id, chapter_id)
@@ -320,6 +325,10 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
 
     # Build prompt using shared function
     prompt = build_chapter_prompt(volume_id, chapter_id, chapter_title, overview, entities)
+
+    # Inject rewrite guidance if provided
+    if rewrite_guidance:
+        prompt += f"\n\n[Quality Gate Rewrite — Previous attempt issues to fix]\n{rewrite_guidance}\n"
 
     # Emit hook for skill injection
     beat_data = {"chapter_id": chapter_id, "title": chapter_title, "overview": overview}
@@ -558,10 +567,22 @@ def run_scene_writer(volume_id: int, start_chapter: int, end_chapter: int):
         state_manager.mark_generating(chapter_id)
 
         try:
-            # Generate chapter content (with progressive saving)
-            content = generate_chapter_content(volume_id, chapter_id, state_manager)
+            # ── Quality Gate rewrite loop ──
+            gate_round = 0
+            max_gate_rounds = 3
+            content = ""
+            guidance = ""
 
-            if content:
+            while gate_round < max_gate_rounds:
+                gate_round += 1
+
+                # Generate chapter content (with progressive saving + guidance injection)
+                content = generate_chapter_content(volume_id, chapter_id, state_manager,
+                                                   rewrite_guidance=guidance if guidance else None)
+
+                if not content:
+                    break
+
                 # Save chapter (returns path, needs_rewrite, guidance)
                 save_result = save_chapter_content(volume_id, chapter_id, content)
                 if isinstance(save_result, tuple):
@@ -570,13 +591,6 @@ def run_scene_writer(volume_id: int, start_chapter: int, end_chapter: int):
                     final_path = save_result
                     needs_rewrite = False
                     guidance = ""
-
-                # Mark as completed
-                state_manager.mark_completed(chapter_id)
-
-                # Delete temp file if exists
-                if temp_path.exists():
-                    temp_path.unlink()
 
                 # Emit after scene write hook
                 beat_data = {"chapter_id": chapter_id, "beats": [], "needs_rewrite": needs_rewrite, "guidance": guidance}
@@ -588,16 +602,55 @@ def run_scene_writer(volume_id: int, start_chapter: int, end_chapter: int):
                 # Emit chapter render hook (de-AI engine)
                 event_bus.emit("on_chapter_render", content, chapter_id)
 
-                # Emit chapter complete hook (memory sedimentation, retention, quality)
+                # Emit chapter complete hook (memory sedimentation, quality gate)
                 event_bus.emit("on_after_chapter_complete", chapter_id, content)
+
+                # ── Check quality gate result ──
+                from core.quality_gate import get_last_result
+                gate_result = get_last_result()
+                gate_verdict = gate_result.verdict if gate_result else None
+                gate_guidance = gate_result.rewrite_guidance if gate_result else ""
+
+                if gate_verdict == "PASS" or gate_verdict is None:
+                    if gate_verdict == "PASS":
+                        print(f"  [OK] Quality Gate: PASS (round {gate_round})")
+                    else:
+                        print(f"  [OK] Quality Gate: no gate result (round {gate_round})")
+                    break
+                elif gate_verdict == "REWRITE" and gate_round < max_gate_rounds:
+                    guidance = gate_guidance
+                    print(f"  [REWRITE] Quality Gate: REWRITE (round {gate_round}/{max_gate_rounds})")
+                    for sk in event_bus.subscribers:
+                        if hasattr(sk, 'record_rewrite'):
+                            sk.record_rewrite(chapter_id)
+                            break
+                elif gate_verdict == "BLOCK":
+                    print(f"  [BLOCKED] Quality Gate: BLOCKED after {gate_round} rounds")
+                    break
+                else:
+                    # REWRITE but max rounds exceeded
+                    print(f"  [BLOCKED] Quality Gate: max rounds ({max_gate_rounds}) exceeded")
+                    gate_verdict = "BLOCK"
+                    break
+
+            if content:
+                # Mark as completed (or blocked)
+                if gate_verdict == "BLOCK":
+                    state_manager.mark_failed(chapter_id, f"Quality Gate BLOCKED after {gate_round} rounds")
+                    failed += 1
+                else:
+                    state_manager.mark_completed(chapter_id)
+                    completed += 1
+
+                # Delete temp file if exists
+                if temp_path.exists():
+                    temp_path.unlink()
 
                 # Track entity states for this chapter
                 from core.entity_tracker import track_chapter_entities
                 track_chapter_entities(volume_id, chapter_id)
-
-                completed += 1
             else:
-                state_manager.mark_failed(chapter_id, "内容为空")
+                state_manager.mark_failed(chapter_id, "content empty")
                 failed += 1
         except Exception as e:
             error_msg = str(e)
