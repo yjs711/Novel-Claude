@@ -1,6 +1,7 @@
 import click
 import os
 import sys
+from datetime import datetime
 
 # ── Logging: configure ONCE before everything ──
 from utils.logger import setup_logging
@@ -578,6 +579,28 @@ def logs(lines, level, follow):
         else:
             click.echo(line.rstrip())
 
-    print(f"\n[{all_lines.index(line)+1 if all_lines else 0} lines total, showing last {min(len(all_lines), lines)}]")
+    print(f"\n[{len(all_lines)} lines total, showing last {min(len(all_lines), lines)}]")
     print(f"Log file: {log_path}")
     print(f"Size: {log_path.stat().st_size / 1024:.1f} KB")
+
+
+@cli.command()
+def log_files():
+    """List all log files (daily archives)"""
+    from utils.logger import LOG_DIR
+    files = sorted(LOG_DIR.glob("novel_claude*"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not files:
+        print("[INFO] No log files found")
+        return
+
+    now = datetime.now()
+    for f in files:
+        mtime = datetime.fromtimestamp(f.stat().st_mtime)
+        age = now - mtime
+        if age.days == 0:
+            age_str = f"{age.seconds // 3600}h ago" if age.seconds >= 3600 else f"{age.seconds // 60}m ago"
+        else:
+            age_str = f"{age.days}d ago"
+        size_kb = f.stat().st_size / 1024
+        marker = " ← CURRENT" if f.name == "novel_claude" or f.suffix == "" else ""
+        click.echo(f"  {f.name:40s} {size_kb:8.1f} KB  {age_str:10s}{marker}")

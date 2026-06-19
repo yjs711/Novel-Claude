@@ -19,6 +19,9 @@ from utils.config_loader import get_config
 from utils.llm_client import ProgressiveWriter, generate_stream
 from core.context_assembler import assemble_context, get_assembler
 from core.event_bus import event_bus
+from utils.logger import get_logger, log_step
+
+logger = get_logger(__name__)
 from utils.chapter_state import get_state_manager, STATE_PENDING, STATE_GENERATING, STATE_COMPLETED, STATE_FAILED
 
 
@@ -661,10 +664,13 @@ def run_scene_writer(volume_id: int, start_chapter: int, end_chapter: int):
                     break
 
                 # Save + emit hooks + run quality gate (shared pipeline)
+                log_step("Chapter post-process", chapter_id=chapter_id, volume_id=volume_id,
+                         words=len(content), round=gate_round)
                 final_path, gate_verdict, gate_guidance = post_process_chapter(
                     volume_id, chapter_id, content)
 
                 if gate_verdict == "PASS" or gate_verdict is None:
+                    log_step("Chapter PASS", chapter_id=chapter_id, round=gate_round)
                     if gate_verdict == "PASS":
                         print(f"  [OK] Quality Gate: PASS (round {gate_round})")
                     else:
@@ -672,17 +678,20 @@ def run_scene_writer(volume_id: int, start_chapter: int, end_chapter: int):
                     break
                 elif gate_verdict == "REWRITE" and gate_round < max_gate_rounds:
                     guidance = gate_guidance
-                    print(f"  [REWRITE] Quality Gate: REWRITE (round {gate_round}/{max_gate_rounds})")
+                    logger.warning("Quality Gate: REWRITE round %d/%d, chapter %d",
+                                   gate_round, max_gate_rounds, chapter_id)
+                    log_step("Chapter REWRITE", chapter_id=chapter_id, round=gate_round)
                     for sk in event_bus.subscribers:
                         if hasattr(sk, 'record_rewrite'):
                             sk.record_rewrite(chapter_id)
                             break
                 elif gate_verdict == "BLOCK":
-                    print(f"  [BLOCKED] Quality Gate: BLOCKED after {gate_round} rounds")
+                    logger.error("Quality Gate: BLOCKED chapter %d after %d rounds",
+                                 chapter_id, gate_round)
+                    log_step("Chapter BLOCKED", chapter_id=chapter_id, rounds=gate_round)
                     break
                 else:
-                    # REWRITE but max rounds exceeded
-                    print(f"  [BLOCKED] Quality Gate: max rounds ({max_gate_rounds}) exceeded")
+                    logger.error("Quality Gate: max rounds exceeded, chapter %d", chapter_id)
                     gate_verdict = "BLOCK"
                     break
 

@@ -17,7 +17,10 @@ import json
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 
+from utils.logger import get_logger, log_step
 from core.continuity_engine import Finding
+
+logger = get_logger(__name__)
 
 
 # ── Gate thresholds ───────────────────────────────────────────────────────────
@@ -236,7 +239,7 @@ def evaluate(
         for s in deai_report["suggestions"][:2]:
             guidance_parts.append(f"[DeAI] {s}")
 
-    return GateResult(
+    result = GateResult(
         overall_score=overall,
         dimensions=all_dims,
         verdict=verdict,
@@ -245,6 +248,17 @@ def evaluate(
         continuity_critical=critical_count,
         continuity_warnings=warning_count,
     )
+
+    log_step("Quality Gate evaluated", score=overall, verdict=verdict,
+             round=rewrite_round, critical=critical_count, warnings=warning_count)
+
+    if verdict in ("REWRITE", "BLOCK"):
+        logger.warning("Gate %s: score=%d, continuity(critical=%d, warnings=%d)",
+                       verdict, overall, critical_count, warning_count)
+    else:
+        logger.success("Gate PASS: score=%d", overall)
+
+    return result
 
 
 # ── Quick evaluation (no Editor LLM call) ────────────────────────────────────
