@@ -1168,8 +1168,8 @@ function doRewriteExec() {
   if (!promptText) { showToast('请输入改写要求', true); if (rp) rp.focus(); return; }
 
   var out = el('rewriteOutput'); var st = el('rewriteStatus');
-  if (out) { out.style.display = ''; out.textContent = ''; }
-  if (st) { st.textContent = '改写中...'; st.style.color = 'var(--text2)'; }
+  if (out) { out.style.display = 'block'; out.textContent = '改写中...\\n'; }
+  if (st) { st.textContent = '正在调用模型...'; st.style.color = 'var(--text2)'; }
   el('btnRewriteCancel').style.display = '';
 
   var ac = new AbortController(); _rewriteAbort = ac;
