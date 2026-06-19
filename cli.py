@@ -760,3 +760,40 @@ def log_files():
         size_kb = f.stat().st_size / 1024
         marker = " ← CURRENT" if f.name == "novel_claude" or f.suffix == "" else ""
         click.echo(f"  {f.name:40s} {size_kb:8.1f} KB  {age_str:10s}{marker}")
+
+
+# ── inspiration workshop ──────────────────────────────────────────────────
+
+@cli.command()
+@click.option('--genre', '-g', type=str, default=None, help='体裁: 修仙/都市/玄幻/重生/悬疑')
+@click.option('--count', '-n', type=int, default=3, help='生成数量')
+def inspire(genre, count):
+    """生成创意起点: 开篇钩子+身份+金手指+冲突组合"""
+    from core.inspiration_workshop import (generate_opening_hook, generate_premise,
+        list_genres, GENRE_COMBOS, CHAPTER_CYCLE)
+
+    if genre and genre not in GENRE_COMBOS:
+        print(f"可用体裁: {', '.join(list_genres())}")
+        return
+
+    print(f"\n{'='*60}")
+    print(f"  灵感工坊 — 五步两段法 + 四大钩子公式")
+    print(f"  体裁: {genre if genre else '随机'} | 生成: {count}个创意")
+    print(f"{'='*60}\n")
+
+    for i in range(count):
+        hook = generate_opening_hook(genre)
+        premise = generate_premise(genre or "修仙")
+        print(f"#{i+1} [{hook['hook_name']}]")
+        print(f"  身份: {hook['identity']}")
+        print(f"  金手指: {hook['golden_finger']}")
+        print(f"  冲突: {hook['conflict']}")
+        print(f"  一句话: {premise.title_hook}")
+        print(f"  开篇场景: {premise.opening_scene}")
+        print(f"  对话场景: {premise.dialogue_hook[:100]}")
+        print()
+
+    print(f"章纲模板 ({CHAPTER_CYCLE['name']}):")
+    for step in CHAPTER_CYCLE["steps"]:
+        print(f"  {step['name']}({step['length']}): {step['content_hint']}")
+    print(f"  对话要求: 第3步和第4步必须有对话")
