@@ -4,7 +4,7 @@ import os
 from zhipuai import ZhipuAI
 
 # Use Zhipu API key — check env first, fallback to config
-_api_key = os.getenv("ZHIPU_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")
+_api_key = os.getenv("ZHIPU_API_KEY", "")
 
 client = ZhipuAI(api_key=_api_key)
 

@@ -318,8 +318,8 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
         style_prompt = build_style_prompt(genre_name)
         if style_prompt:
             prompt = style_prompt + "\n" + prompt
-    except Exception:
-        pass  # Non-critical
+    except Exception as e:
+        logger.debug("Style reference injection skipped: %s", e)
 
     # Inject rewrite guidance if provided
     if rewrite_guidance:
@@ -343,8 +343,8 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
             diversity_ctx = build_diversity_context(recent_fps)
             if diversity_ctx:
                 prompt += diversity_ctx
-    except Exception:
-        pass  # Non-critical, don't block generation
+    except Exception as e:
+        logger.debug("Diversity context skipped: %s", e)
 
     # Inject storyform constraints (NCP v1.3.0 — structural narrative argument)
     try:
@@ -362,8 +362,8 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
             if sf_context:
                 prompt += sf_context
                 print(f"  [OK] Storyform (NCP) constraints injected")
-    except Exception:
-        pass  # Non-critical
+    except Exception as e:
+        logger.debug("Storyform injection skipped: %s", e)
 
     # Inject genre knowledge — slim: only this chapter's relevant hooks + mistakes
     try:
@@ -373,13 +373,12 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
         if genre_name:
             gk = get_genre_knowledge(genre_name)
             if gk:
-                # Slim injection: just hooks + avoid-list for this chapter
                 hook_str = " | ".join(gk.hook_templates[:3]) if gk.hook_templates else ""
                 avoid_str = " | ".join(gk.common_mistakes[:3]) if gk.common_mistakes else ""
                 slim = f"\n[{gk.name}] 可用钩子: {hook_str}. 避免: {avoid_str}.\n"
                 prompt += slim
-    except Exception:
-        pass  # Non-critical
+    except Exception as e:
+        logger.debug("Genre knowledge skipped: %s", e)
 
     # Mark unified injections so duplicate skills skip themselves
     # (context is shared across all skills via event_bus subscribers)
