@@ -89,22 +89,16 @@
     "editor_weight": 0.3
   },
   "workflow": {
-    "mode": "standard"
+    "mode": "quick"
   },
   "genre": "修仙",
-  "style": "网文爽文",
+  "style": "热血燃向",
   "context_256k": {
     "full_text_chapters": 3,
     "detail_summary_chapters": 50,
-    "medium_summary_chapters": 150,
-    "plot_thread_vertical_tokens": 30000,
-    "character_arc_tokens": 20000,
-    "rag_retrieval_tokens": 30000,
-    "reserve_buffer_tokens": 25000
+    "medium_summary_chapters": 150
   },
   "performance": {
-    "entity_tracker_batch_interval": 10,
-    "story_state_shard_by_volume": true,
-    "continuity_cache_enabled": true
+    "story_state_shard_by_volume": true
   }
 }

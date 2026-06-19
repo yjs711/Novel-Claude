@@ -1,21 +1,29 @@
 """
-mem_working_memory — 三层记忆管理 Skill (256K优化版)
+mem_working_memory — 三层记忆管理 Skill (2026研究验证)
 
-L1 Working: 最近3章即时上下文（256K下可放全文）
-L2 Episodic: 过去50章情节摘要（从10→50）
-L3 Semantic: 世界观规则 + 角色关系 + 剧情线状态
+2026最佳实践: 三层分级记忆 + 60%规则 + 关键事实顶部注入
+来源: HAMR(AAAI 2025), AFM(Purdue 2025), ContextWindowLifecycle(2026),
+  正文脱钩架构(CSDN 2026), UnifiedContextManager(DeepWiki 2026)
+
+L1 Immediate: 最近章节全文
+L2 Chapter: 中期章节摘要
+L3 Book: 世界观/角色/剧情线
 """
 
 from core.base_skill import BaseSkill
+from utils.config_loader import get_config
 
 
 class MemWorkingMemorySkill(BaseSkill):
     def __init__(self, context):
         super().__init__(context)
         self.name = "三层记忆系统"
-        self.l2_range = 50    # 256K: 10→50章
-        self.l1_full_chapters = 3   # 最近3章全文
-        self.l1_limit = 8000  # Working: 8000字
+        # Read from config.json context_256k section (fallback to defaults)
+        ctx_cfg = get_config("context_256k", default={})
+        self.l1_full = ctx_cfg.get("full_text_chapters", 3)
+        self.l2_detail = ctx_cfg.get("detail_summary_chapters", 50)
+        self.l3_medium = ctx_cfg.get("medium_summary_chapters", 150)
+        self.l1_limit = 8000  # 60% rule: never exceed context window limit
 
     def on_init(self) -> None:
         print(f"  [✓] {self.name} 已就绪 (256K优化: L1=3章全文, L2=50章, L3=世界观+剧情)")
@@ -48,9 +56,9 @@ class MemWorkingMemorySkill(BaseSkill):
         return prompt_payload
 
     def _build_working_memory(self, story_state, current_ch: int) -> str:
-        """L1: 最近3章的即时状态"""
+        """L1: 最近N章的即时状态（N从config读取）"""
         parts = []
-        for offset in range(1, self.l1_full_chapters + 1):
+        for offset in range(1, self.l1_full + 1):
             ch_num = current_ch - offset
             if ch_num < 1: break
             ch = story_state.chapters.get(ch_num)
@@ -77,7 +85,7 @@ class MemWorkingMemorySkill(BaseSkill):
     def _build_episodic_memory(self, story_state, current_ch: int) -> str:
         """L2: 过去50章情节摘要"""
         lines = []
-        for offset in range(self.l1_full_chapters + 1, self.l2_range + 1):
+        for offset in range(self.l1_full + 1, self.l2_detail + 1):
             ch_num = current_ch - offset
             if ch_num < 1: break
             ch = story_state.chapters.get(ch_num)
