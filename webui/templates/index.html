@@ -423,8 +423,16 @@
 
   <div class="status-badge"><span class="status-dot"></span> LM Studio 已连接</div>
 
+  <div class="section-label">📁 项目 <span style="font-size:10px;color:var(--text3)">（切换即保存）</span></div>
+  <div style="display:flex;gap:4px;margin-bottom:4px">
+    <select id="projectSelect" onchange="switchProject(this.value)" style="flex:1;font-size:12px"><option value="">-- 新建或选择 --</option></select>
+    <button class="btn btn-ghost" onclick="newProject()" style="min-width:28px" title="新建项目">+</button>
+    <button class="btn btn-ghost" onclick="deleteProject()" style="min-width:28px;color:var(--bad)" title="删除当前项目">x</button>
+  </div>
+  <div id="projectInfo" style="font-size:10px;color:var(--text3);margin-bottom:6px"></div>
+
   <div class="section-label">项目设置</div>
-  <input id="novelName" placeholder="小说名称...">
+  <input id="novelName" placeholder="小说名称..." readonly style="opacity:0.7">
   <input id="logline" placeholder="一句话创作灵感...">
   <button class="btn btn-primary btn-block" onclick="doInit()">初始化世界观</button>
 
@@ -444,15 +452,18 @@
   </div>
 
   <div class="divider"></div>
-  <div class="section-label">AI 模型选择</div>
-  <select id="modelSelect" onchange="switchModel(this.value)" style="margin-bottom:4px"></select>
-  <div id="currentModel" style="font-size:11px;color:var(--text3);margin-bottom:6px"></div>
-  <div class="section-label" style="font-size:10px">📋 大纲策划用</div>
-  <select id="taskPlanningModel" onchange="switchTaskModel('planning', this.value)" style="margin-bottom:4px;font-size:11px"></select>
-  <div class="section-label" style="font-size:10px">✍️ 正文执笔用</div>
-  <select id="taskWritingModel" onchange="switchTaskModel('writing', this.value)" style="margin-bottom:4px;font-size:11px"></select>
-  <div class="section-label" style="font-size:10px">🔍 推理分析用</div>
-  <select id="taskReasoningModel" onchange="switchTaskModel('reasoning', this.value)" style="font-size:11px"></select>
+  <div class="section-label">🧠 模型分工</div>
+  <div class="section-label" style="font-size:10px">📋 大纲策划（Architect）</div>
+  <select id="taskPlanningModel" onchange="switchTaskModel('planning', this.value)" style="margin-bottom:6px;font-size:11px"></select>
+  <div class="section-label" style="font-size:10px">✍️ 正文执笔（Scribe / Polisher）</div>
+  <select id="taskWritingModel" onchange="switchTaskModel('writing', this.value)" style="margin-bottom:6px;font-size:11px"></select>
+  <div class="section-label" style="font-size:10px">🔍 审阅分析（Editor / Gatekeeper）</div>
+  <select id="taskReasoningModel" onchange="switchTaskModel('reasoning', this.value)" style="margin-bottom:6px;font-size:11px"></select>
+
+  <div style="border-top:1px dashed var(--border);margin:8px 0;padding-top:6px"></div>
+  <div class="section-label" style="font-size:10px;color:var(--text3)">⬇️ 回退模型（未配分工时使用）</div>
+  <select id="modelSelect" onchange="switchModel(this.value)" style="margin-bottom:4px;font-size:10px;opacity:0.7"></select>
+  <div id="currentModel" style="font-size:10px;color:var(--text3);margin-bottom:6px"></div>
 
   <div class="divider"></div>
   <div class="project-info" id="projectStatus"></div>
@@ -479,6 +490,10 @@
     <div class="toolbar">
       <label>卷</label><input id="volInput" value="1" type="number" min="1">
       <label>章</label><input id="chInput" value="1" type="number" min="1">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="agentMode" style="width:auto">
+        <span title="standard/deep模式下启用5 Agent协作流水线">多Agent</span>
+      </label>
       <button class="btn btn-primary" onclick="doWrite()">开始写作</button>
       <button class="btn btn-warning" onclick="doPlan()">生成卷大纲</button>
       <button class="btn btn-ghost" onclick="doPlanMacro()">宏观大纲</button>
@@ -1715,7 +1730,7 @@ async function loadModels() {
       sel.innerHTML += `<option value="${key}" ${key === r.default ? 'selected' : ''}>${m.label}</option>`;
     }
     document.getElementById('currentModel').textContent =
-      '全局默认: ' + (r.models[r.default]?.label || r.default);
+      '回退: ' + (r.models[r.default]?.label || r.default);
 
     // Populate task model selectors
     const tm = r.task_models || {};
@@ -1879,10 +1894,13 @@ async function doWrite() {
   const vol = parseInt(document.getElementById('volInput').value);
   const ch = parseInt(document.getElementById('chInput').value);
   const out = document.getElementById('writeOutput');
-  out.innerHTML = '<span class="sys"><span class="spinner"></span> 正在生成第 ' + vol + ' 卷第 ' + ch + ' 章…</span>\n\n';
+  const agentMode = document.getElementById('agentMode')?.checked;
+  const url = API + '/write-stream' + (agentMode ? '?mode=agent' : '');
+  const modeLabel = agentMode ? ' (多Agent协作)' : ' (快速)';
+  out.innerHTML = '<span class="sys"><span class="spinner"></span> 正在生成第 ' + vol + ' 卷第 ' + ch + ' 章' + modeLabel + '…</span>\n\n';
 
   try {
-    const resp = await fetch(API + '/write-stream', {
+    const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ volume: vol, chapter: ch })
@@ -1908,6 +1926,14 @@ async function doWrite() {
             out.appendChild(span);
           } else if (data.type === 'status') {
             out.innerHTML += '<div class="sys" style="margin:8px 0">' + data.msg + '</div>';
+          } else if (data.type === 'agent_progress') {
+            out.innerHTML += '<div class="sys" style="margin:8px 0">🤖 ' + data.stage + ' (' + Math.round(data.progress * 100) + '%)</div>';
+          } else if (data.type === 'agent_result') {
+            out.innerHTML += '<div class="done" style="margin:12px 0">📊 Agent评分: ' + (data.score || '?') + '/100 · 重写 ' + (data.revision_rounds || 0) + ' 轮</div>';
+            if (data.dimensions) {
+              const dims = Object.entries(data.dimensions).map(([k,v]) => k + ':' + v).slice(0,5).join(' ');
+              out.innerHTML += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">' + dims + '</div>';
+            }
           } else if (data.type === 'done' || data.type === 'complete') {
             out.innerHTML += '<div class="done" style="margin:12px 0">✦ 第 ' + (data.chapter || ch) + ' 章完成 · ' + (data.words || '?') + ' 字</div>';
             document.getElementById('wordCount').textContent = (data.words || '?') + ' 字';
@@ -1976,6 +2002,18 @@ async function doDeAI() {
           ${d.markers && d.markers.length ? '<div style="font-size:11px;color:var(--text3);margin-top:5px">检测到: ' + d.markers.slice(0,5).join('、') + '</div>' : ''}
         </div>
       `).join('')}
+      ${r.adj_density ? `
+        <div class="suggestion-box" style="margin-top:10px">
+          <div class="stitle">六层检测详情 (L3-L6)</div>
+          <table style="width:100%;font-size:12px;color:var(--text2);margin-top:8px">
+            <tr><td>L3 修饰密度</td><td>${r.adj_density.density} / 300字</td><td style="color:${r.adj_density.score<50?'var(--bad)':'var(--text3)'}">${r.adj_density.score}分 ${r.adj_density.modifier_count}个修饰词</td></tr>
+            <tr><td>L4 成语密度</td><td>${r.idiom_density.density} / 500字</td><td style="color:${r.idiom_density.score<50?'var(--bad)':'var(--text3)'}">${r.idiom_density.score}分 连续${r.idiom_density.max_consecutive}个</td></tr>
+            <tr><td>L5 段落变异</td><td>方差 ${r.para_variation.variance}</td><td style="color:${r.para_variation.score<70?'var(--warn)':'var(--text3)'}">${r.para_variation.score}分 单句段${(r.para_variation.single_ratio*100).toFixed(0)}%</td></tr>
+            <tr><td>L6 标点节奏</td><td>省${r.punct_rhythm.ellipsis_per_k} 叹${r.punct_rhythm.exclamation_per_k} 破${r.punct_rhythm.dash_per_k}/千字</td><td style="color:${r.punct_rhythm.score<70?'var(--warn)':'var(--text3)'}">${r.punct_rhythm.score}分</td></tr>
+          </table>
+          ${(r.para_variation.issues||[]).concat(r.punct_rhythm.issues||[]).length ? '<div style="font-size:11px;color:var(--warn);margin-top:4px">' + r.para_variation.issues.concat(r.punct_rhythm.issues).join('；') + '</div>' : ''}
+        </div>
+      ` : ''}
       ${r.suggestions && r.suggestions.length ? `
         <div class="suggestion-box">
           <div class="stitle">优化建议</div>
@@ -2069,18 +2107,24 @@ async function acceptDeAIRewrite() {
 async function refreshStatus() {
   try {
     const r = await api('GET', '/status');
+    let wfMode = 'quick';
+    try { const cfg = await api('GET', '/config'); wfMode = cfg.workflow?.mode || 'quick'; } catch(e) {}
+
     document.getElementById('projectStatus').innerHTML =
       '📖 ' + (r.title || r.novel_name || '未命名') + '<br>' +
       (r.genre ? '🎭 ' + r.genre : '') + (r.genre ? '<br>' : '') +
-      '📍 第 ' + (r.cur_chapter || 0) + ' 章';
+      '📍 第 ' + (r.cur_chapter || 0) + ' 章<br>' +
+      '⚙️ 工作流: ' + wfMode;
 
     const grid = document.getElementById('statusGrid');
     const stats = [
-      ['当前模型', r.model || '?', ''],
+      ['策划模型', '35B Opus', ''],
+      ['执笔模型', '27B Uncensored', ''],
+      ['审阅模型', '35B Opus', ''],
       ['角色', r.char_count || 0, ''],
       ['剧情线', r.thread_count || 0, ''],
       ['已完成章', r.chapter_count || 0, ''],
-      ['当前进度', '第 ' + (r.cur_chapter || 0) + ' 章', ''],
+      ['工作流模式', wfMode, ''],
       ['流派', r.genre || '未指定', ''],
     ];
     grid.innerHTML = stats.map(([label, value]) => `
@@ -2109,11 +2153,9 @@ async function refreshStatus() {
 // ── Settings ──
 async function setGenre() {
   const g = document.getElementById('genreSelect').value;
-  await fetch(API + '/config', { method: 'POST', body: new FormData(), headers: { 'X-Override': 'genre=' + g } });
-  // fallback: use URL params
-  const form = new FormData(); form.append('genre', g);
-  await fetch(API + '/config', { method: 'POST', body: form });
-  toast('流派 → ' + g);
+  await api('POST', '/config', { genre: g });
+  await loadStylesForGenre(g);
+  toast('流派 → ' + g + '（风格已更新）');
 }
 async function setStyle() {
   const s = document.getElementById('styleSelect').value;
@@ -2132,13 +2174,83 @@ async function setWorkflow() {
 (async function () {
   try {
     const genres = await api('GET', '/genres');
-    document.getElementById('genreSelect').innerHTML = genres.map(g => '<option>' + g + '</option>').join('');
-    const styles = await api('GET', '/styles');
-    document.getElementById('styleSelect').innerHTML = styles.map(s => '<option>' + s + '</option>').join('');
+    const gs = document.getElementById('genreSelect');
+    gs.innerHTML = genres.map(g => '<option>' + g + '</option>').join('');
+    gs.onchange = () => loadStylesForGenre(gs.value);
+    await loadStylesForGenre(gs.value || genres[0]);
   } catch (e) { }
+
+async function loadStylesForGenre(genre) {
+  try {
+    const styles = await api('GET', '/styles?genre=' + encodeURIComponent(genre || ''));
+    const ss = document.getElementById('styleSelect');
+    const cur = ss.value;
+    ss.innerHTML = styles.map(s => '<option>' + s + '</option>').join('');
+    if (styles.includes(cur)) ss.value = cur;
+  } catch(e) {}
+}
   await loadModels();
+  await loadProjects();
   await refreshStatus();
 })();
+
+async function loadProjects() {
+  try {
+    const r = await api('GET', '/projects');
+    const sel = document.getElementById('projectSelect');
+    sel.innerHTML = '<option value="">-- 新建或选择 --</option>' +
+      r.projects.map(p => '<option value="' + p.name + '">' + p.name + ' (' + p.chapters + '章)</option>').join('');
+    if (r.active) {
+      sel.value = r.active;
+      document.getElementById('novelName').value = r.active;
+      const p = r.projects.find(x => x.name === r.active);
+      if (p) document.getElementById('projectInfo').textContent = p.chapters + '章 · ' + p.dir;
+    }
+  } catch(e) {}
+}
+
+async function switchProject(name) {
+  if (!name) return;
+  try {
+    const r = await api('POST', '/projects/switch', { name });
+    if (r.ok) {
+      document.getElementById('novelName').value = name;
+      toast('Switched: ' + name);
+      await refreshStatus();
+      await loadProjects();
+    }
+  } catch(e) { toast('Failed: ' + e.message); }
+}
+
+async function newProject() {
+  const name = prompt('New project name:');
+  if (!name || !name.trim()) return;
+  try {
+    const r = await api('POST', '/projects/switch', { name: name.trim() });
+    if (r.ok) {
+      document.getElementById('novelName').value = name.trim();
+      toast('Created: ' + name.trim());
+      await loadProjects();
+      await refreshStatus();
+    }
+  } catch(e) { toast('Failed: ' + e.message); }
+}
+
+async function deleteProject() {
+  const sel = document.getElementById('projectSelect');
+  const name = sel.value;
+  if (!name) return toast('Select a project first');
+  if (!confirm('Delete project "' + name + '"? This cannot be undone!')) return;
+  try {
+    const r = await api('POST', '/projects/delete', { name });
+    if (r.ok) {
+      document.getElementById('novelName').value = '';
+      toast('Deleted: ' + name);
+      await loadProjects();
+      await refreshStatus();
+    }
+  } catch(e) { toast('Failed: ' + e.message); }
+}
 </script>
 </body>
 </html>

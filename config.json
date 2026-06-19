@@ -1,7 +1,7 @@
 {
   "llm": {
     "provider": "lmstudio",
-    "model": "auto",
+    "model": "qwen3.6-27b-uncensored",
     "base_url": "http://localhost:61183/v1",
     "timeout": 600,
     "api_key": "lm-studio-no-auth-needed",
@@ -86,7 +86,7 @@
     "editor_review_enabled": true,
     "continuity_weight": 0.25,
     "deai_weight": 0.25,
-    "editor_weight": 0.30
+    "editor_weight": 0.3
   },
   "workflow": {
     "mode": "standard"

@@ -24,8 +24,8 @@ core/                  ← 微内核
 skills/                ← 13个插件（1个已有 + 12个新增）
   ├── det_continuity_engine/  ← 9项连续性检查（零token）
   ├── det_story_state_crud/   ← StoryState 持久化
-  ├── gen_genre_tags/         ← 10种流派标签
-  ├── gen_writing_style/      ← 9种写作风格
+  ├── gen_genre_tags/         ← 29种流派标签
+  ├── gen_writing_style/      ← 20种写作风格
   ├── gen_deai_engine/        ← 去AI味检测
   ├── mem_fact_summary/       ← BM25+距离衰减事实摘要
   ├── mem_working_memory/     ← 三层记忆（L1/L2/L3）

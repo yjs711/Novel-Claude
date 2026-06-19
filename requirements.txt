@@ -8,3 +8,6 @@ sniffio
 anyio
 pyahocorasick>=2.1.0
 customtkinter
+
+pyyaml>=6.0
+sentence-transformers>=3.0

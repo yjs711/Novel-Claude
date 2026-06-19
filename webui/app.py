@@ -1954,19 +1954,12 @@ def _load_prompt_refs(*fnames: str) -> str:
     return "\n\n".join(parts)
 
 def _planning_ref() -> str:
-    """策划阶段：市场趋势 + 写作教程 + 叙事手法"""
-    return _load_prompt_refs(
-        "genre-market-reference-2026.md",
-        "bilibili-writing-crash-course.md",
-        "narrative-pov-immersion.md"
-    )
+    """Market references unified into genre_knowledge.py + style_reference.py"""
+    return ""
 
 def _writing_ref() -> str:
-    """正文阶段：只注入写作技巧和叙事手法，不注入市场趋势（正文应按大纲细纲走）"""
-    return _load_prompt_refs(
-        "bilibili-writing-crash-course.md",
-        "narrative-pov-immersion.md"
-    )
+    """Market references unified into genre_knowledge.py + style_reference.py"""
+    return ""
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8765, log_level="info")

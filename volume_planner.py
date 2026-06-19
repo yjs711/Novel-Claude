@@ -269,11 +269,6 @@ def plan_volume_stages(volume_id: int):
 # Legacy Support (for backward compatibility)
 # ============================================================================
 
-# Keep the old function names as aliases for compatibility
-def plan_macro_outlines_alias(total_volumes: int = 10):
-    plan_macro_outlines(total_volumes)
-
-
 def run_volume_planner(volume_id: int = None):
     if volume_id is None:
         plan_macro_outlines()
