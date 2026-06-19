@@ -478,6 +478,43 @@ def deep_review_chapter(content: str, outline: dict, entity_list: List[str]) -> 
         return {"needs_rewrite": False, "issues": [], "guidance": "", "missing_events": [], "wrong_events": []}
 
 
+def post_process_chapter(volume_id: int, chapter_id: int, content: str,
+                         outline: dict = None) -> tuple:
+    """
+    Shared post-generation pipeline: save -> emit hooks -> quality gate.
+    Called by BOTH CLI (run_scene_writer) and WebUI (/api/write-stream).
+
+    Returns: (final_path: str, gate_verdict: str, gate_guidance: str)
+      gate_verdict: "PASS" | "REWRITE" | "BLOCK" | None (no gate)
+    """
+    # Save
+    save_result = save_chapter_content(volume_id, chapter_id, content, outline)
+    if isinstance(save_result, tuple):
+        final_path, needs_rewrite, basic_guidance = save_result
+    else:
+        final_path = save_result
+        needs_rewrite = False
+        basic_guidance = ""
+
+    # Emit full hook chain
+    beat_data = {
+        "chapter_id": chapter_id, "beats": [],
+        "needs_rewrite": needs_rewrite, "guidance": basic_guidance,
+    }
+    event_bus.emit("on_after_scene_write", beat_data, content)
+    event_bus.emit("on_post_chapter_continuity", chapter_id)
+    event_bus.emit("on_chapter_render", content, chapter_id)
+    event_bus.emit("on_after_chapter_complete", chapter_id, content)
+
+    # Check quality gate result
+    from core.quality_gate import get_last_result
+    gate_result = get_last_result()
+    gate_verdict = gate_result.verdict if gate_result else None
+    gate_guidance = gate_result.rewrite_guidance if gate_result else ""
+
+    return final_path, gate_verdict, gate_guidance
+
+
 def save_chapter_content(volume_id: int, chapter_id: int, content: str, outline: dict = None):
     """Save chapter content to file, with review."""
     save_dir = Path(MANUSCRIPTS_DIR) / f"vol_{volume_id:02d}"
@@ -583,33 +620,9 @@ def run_scene_writer(volume_id: int, start_chapter: int, end_chapter: int):
                 if not content:
                     break
 
-                # Save chapter (returns path, needs_rewrite, guidance)
-                save_result = save_chapter_content(volume_id, chapter_id, content)
-                if isinstance(save_result, tuple):
-                    final_path, needs_rewrite, guidance = save_result
-                else:
-                    final_path = save_result
-                    needs_rewrite = False
-                    guidance = ""
-
-                # Emit after scene write hook
-                beat_data = {"chapter_id": chapter_id, "beats": [], "needs_rewrite": needs_rewrite, "guidance": guidance}
-                event_bus.emit("on_after_scene_write", beat_data, content)
-
-                # Emit post-chapter continuity hook (zero-token checks)
-                event_bus.emit("on_post_chapter_continuity", chapter_id)
-
-                # Emit chapter render hook (de-AI engine)
-                event_bus.emit("on_chapter_render", content, chapter_id)
-
-                # Emit chapter complete hook (memory sedimentation, quality gate)
-                event_bus.emit("on_after_chapter_complete", chapter_id, content)
-
-                # ── Check quality gate result ──
-                from core.quality_gate import get_last_result
-                gate_result = get_last_result()
-                gate_verdict = gate_result.verdict if gate_result else None
-                gate_guidance = gate_result.rewrite_guidance if gate_result else ""
+                # Save + emit hooks + run quality gate (shared pipeline)
+                final_path, gate_verdict, gate_guidance = post_process_chapter(
+                    volume_id, chapter_id, content)
 
                 if gate_verdict == "PASS" or gate_verdict is None:
                     if gate_verdict == "PASS":

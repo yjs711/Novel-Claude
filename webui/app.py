@@ -34,6 +34,111 @@ def save_cfg(cfg):
     with open(cfg_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
+def _build_genre_style_injection(cfg: dict) -> str:
+    """从 config 读取 genre/style，构建 prompt 注入文本。
+    如果流派/风格未配置或数据库无匹配，返回空字符串。"""
+    genre = cfg.get("genre", "")
+    style = cfg.get("style", "")
+    injection = ""
+
+    if genre:
+        try:
+            from skills.gen_genre_tags.skill import GENRE_DB
+            g = GENRE_DB.get(genre)
+            if g:
+                injection += f"\n\n[流派: {genre}]\n"
+                injection += f"- 反套路模式（严格禁止）: {'、'.join(g.get('antiPatterns', []))}\n"
+                injection += f"- 节奏策略: {g.get('pacingStrategy', '')}\n"
+                injection += f"- 典型结构: {g.get('typicalStructure', '')}\n"
+                if g.get('worldRules'):
+                    injection += f"- 世界规则: {'; '.join(g['worldRules'])}\n"
+        except Exception:
+            pass
+
+    if style:
+        try:
+            from skills.gen_writing_style.skill import STYLE_DB
+            s = STYLE_DB.get(style)
+            if s:
+                injection += f"\n\n[写作风格: {style}]\n"
+                injection += f"{s.get('promptInjection', '')}\n"
+                injection += f"- 偏好词汇: {'、'.join(s.get('vocabulary', [])[:8])}\n"
+                injection += f"- 禁止: {'、'.join(s.get('avoidPatterns', []))}\n"
+                injection += f"- 对话风格: {s.get('dialogueStyle', '')}\n"
+                injection += f"- 叙事距离: {s.get('narrativeDistance', '')}\n"
+        except Exception:
+            pass
+
+    return injection
+
+
+# ── project management ──────────────────────────────────────────────────
+
+@app.get("/api/projects")
+async def list_projects():
+    """List all novel projects (directories matching .novel_*)."""
+    projects = []
+    base = Path(__file__).parent.parent
+    for d in sorted(base.iterdir()):
+        if d.is_dir() and d.name.startswith(".novel_"):
+            name = d.name[7:]  # strip ".novel_"
+            if name:
+                sp = d / "story_state.json"
+                chapters = len(list((d / "manuscripts").rglob("ch_*_final.md"))) if (d / "manuscripts").exists() else 0
+                projects.append({
+                    "name": name,
+                    "dir": str(d),
+                    "has_story_state": sp.exists(),
+                    "chapters": chapters,
+                })
+    return {"projects": projects, "active": load_cfg().get("workspace", {}).get("novel_name", "")}
+
+@app.post("/api/projects/switch")
+async def switch_project(request: Request):
+    """Switch to a different project (or create new one)."""
+    data = await request.json()
+    name = data.get("name", "").strip()
+    if not name:
+        return {"error": "项目名不能为空"}
+
+    cfg = load_cfg()
+    cfg.setdefault("workspace", {})["novel_name"] = name
+    save_cfg(cfg)
+
+    # Ensure directories exist
+    novel_dir = Path(__file__).parent.parent / f".novel_{name}"
+    for sub in ["settings", "volumes", "manuscripts", "memory", "batch_jobs"]:
+        (novel_dir / sub).mkdir(parents=True, exist_ok=True)
+
+    from utils.config import reload_workspace
+    reload_workspace()
+    return {"ok": True, "name": name}
+
+@app.post("/api/projects/delete")
+async def delete_project(request: Request):
+    """Delete a project (only its directory, not config)."""
+    data = await request.json()
+    name = data.get("name", "").strip()
+    if not name:
+        return {"error": "项目名不能为空"}
+
+    novel_dir = Path(__file__).parent.parent / f".novel_{name}"
+    if not novel_dir.exists():
+        return {"error": "项目不存在"}
+
+    import shutil
+    shutil.rmtree(novel_dir)
+
+    # If this was the active project, clear it
+    cfg = load_cfg()
+    if cfg.get("workspace", {}).get("novel_name") == name:
+        cfg["workspace"]["novel_name"] = ""
+        save_cfg(cfg)
+        from utils.config import reload_workspace
+        reload_workspace()
+
+    return {"ok": True}
+
 # ── routes ─────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -46,13 +151,42 @@ async def get_config():
     return load_cfg()
 
 @app.post("/api/config")
-async def update_config(novel_name: str = Form(""), genre: str = Form(""),
-                         style: str = Form(""), workflow: str = Form("")):
+async def update_config(request: Request):
+    """Update config.json fields. Accepts JSON body with any config keys."""
     cfg = load_cfg()
-    if novel_name: cfg["workspace"]["novel_name"] = novel_name
-    if genre: cfg["genre"] = genre
-    if style: cfg["style"] = style
-    if workflow: cfg["workflow"]["mode"] = workflow
+    data = await request.json()
+
+    # Top-level string fields
+    for key in ("novel_name", "genre", "style"):
+        if key in data and data[key]:
+            if key == "novel_name":
+                cfg.setdefault("workspace", {})["novel_name"] = data[key]
+            else:
+                cfg[key] = data[key]
+
+    # Workflow mode
+    if "workflow" in data and data["workflow"]:
+        cfg.setdefault("workflow", {})["mode"] = data["workflow"]
+    if "max_revision_rounds" in data:
+        cfg.setdefault("workflow", {})["max_revision_rounds"] = data["max_revision_rounds"]
+    if "quality_threshold" in data:
+        cfg.setdefault("workflow", {})["quality_threshold"] = data["quality_threshold"]
+
+    # Generation params (温度、惩罚、采样)
+    gen_keys = [
+        "temperature", "temperature_planning", "temperature_writing",
+        "temperature_reasoning", "temperature_deai",
+        "frequency_penalty", "frequency_penalty_writing", "frequency_penalty_deai",
+        "frequency_penalty_planning", "frequency_penalty_reasoning",
+        "presence_penalty", "presence_penalty_writing", "presence_penalty_deai",
+        "presence_penalty_planning", "presence_penalty_reasoning",
+        "top_p", "top_p_writing", "top_p_deai", "top_p_planning", "top_p_reasoning",
+        "max_tokens", "max_retries", "timeout", "retry_delay",
+    ]
+    for key in gen_keys:
+        if key in data and data[key] is not None:
+            cfg.setdefault("generation", {})[key] = data[key]
+
     save_cfg(cfg)
     return {"ok": True}
 
@@ -136,7 +270,52 @@ async def genres():
     return list(GENRE_DB.keys())
 
 @app.get("/api/styles")
-async def styles():
+async def styles(genre: str = ""):
+    from skills.gen_writing_style.skill import STYLE_DB
+    from skills.gen_genre_tags.skill import GENRE_DB
+    if genre and genre in GENRE_DB:
+        return _compatible_styles(genre)
+    return list(STYLE_DB.keys())
+
+
+# ── genre → style compatibility mapping ──────────────────────────────────
+
+def _compatible_styles(genre: str) -> list:
+    """Return styles compatible with the given genre."""
+    # Category-based mapping: each genre category has recommended styles
+    EASTERN_FANTASY = ["网文爽文", "热血燃向", "金庸武侠", "古龙风格", "说书风", "多视角切换"]
+    MODERN = ["网文爽文", "幽默吐槽", "白描纪实", "第一人称口语化", "硬汉冷峻", "现代极简"]
+    SCIFI = ["硬核科幻", "暗黑压抑", "白描纪实", "多视角切换", "现代极简"]
+    HORROR = ["暗黑压抑", "暗黑哥特", "白描纪实", "第一人称口语化"]
+    ROMANCE = ["文艺唯美", "纯文学", "第一人称口语化", "轻小说", "幽默吐槽"]
+    HISTORICAL = ["说书风", "金庸武侠", "文艺唯美", "多视角切换", "纯文学"]
+    LIGHT = ["轻小说", "幽默吐槽", "第一人称口语化", "剧本风"]
+    LITERARY = ["纯文学", "文艺唯美", "意识流", "白描纪实", "现代极简"]
+
+    mapping = {
+        "玄幻": EASTERN_FANTASY, "修仙": EASTERN_FANTASY, "洪荒": EASTERN_FANTASY,
+        "武侠": ["金庸武侠", "古龙风格", "热血燃向", "说书风"],
+        "都市": MODERN, "校园": MODERN, "重生": MODERN, "系统流": MODERN,
+        "总裁": ROMANCE + ["网文爽文"], "宫斗": ROMANCE + ["暗黑压抑", "多视角切换"], "快穿": LIGHT + ROMANCE,
+        "言情": ROMANCE,
+        "科幻": SCIFI, "赛博朋克": SCIFI + ["黑色幽默"], "星际": SCIFI + ["热血燃向"],
+        "末世": ["暗黑压抑", "热血燃向", "白描纪实", "第一人称口语化"],
+        "废土": ["暗黑压抑", "硬汉冷峻", "白描纪实", "现代极简"],
+        "进化": SCIFI + ["暗黑压抑"],
+        "悬疑": ["白描纪实", "暗黑压抑", "第一人称口语化", "硬汉冷峻", "黑色幽默"],
+        "灵异": HORROR, "盗墓": HORROR + ["第一人称口语化"], "克苏鲁": HORROR + ["意识流"],
+        "历史": HISTORICAL, "种田": HISTORICAL + ["白描纪实"],
+        "游戏": ["网文爽文", "热血燃向", "幽默吐槽", "轻小说"],
+        "竞技": ["热血燃向", "白描纪实", "第一人称口语化", "现代极简"],
+        "军事": ["硬汉冷峻", "白描纪实", "多视角切换", "热血燃向"],
+        "轻小说": LIGHT,
+        "无限流": ["网文爽文", "暗黑压抑", "幽默吐槽", "多视角切换"],
+    "规则怪谈": ["暗黑压抑", "白描纪实", "硬汉冷峻", "第一人称口语化"],
+    "发疯文": ["幽默吐槽", "第一人称口语化", "意识流", "黑色幽默"],
+    "家族修仙": ["说书风", "多视角切换", "热血燃向", "文艺唯美"],
+    }
+    if genre in mapping:
+        return mapping[genre]
     from skills.gen_writing_style.skill import STYLE_DB
     return list(STYLE_DB.keys())
 
@@ -152,92 +331,104 @@ async def formulas():
 
 @app.post("/api/write-stream")
 async def write_stream(request: Request):
-    """SSE streaming chapter generation - streams tokens in real-time."""
+    """SSE streaming chapter generation with full parameter support.
+    Query params: ?mode=agent (standard/deep 模式使用多 Agent 流水线)"""
     data = await request.json()
     volume = data.get("volume", 1)
     chapter = data.get("chapter", 1)
+    use_agent = request.query_params.get("mode") == "agent"
 
     async def generate() -> AsyncGenerator[str, None]:
-        yield "data: " + json.dumps({"type": "status", "msg": f"正在生成第{volume}卷第{chapter}章..."}, ensure_ascii=False) + "\n\n"
+        import json as _json
+
+        cfg = load_cfg()
+        gen = cfg.get("generation", {})
+        wf_mode = cfg.get("workflow", {}).get("mode", "quick")
+
+        yield "data: " + _json.dumps({"type": "status", "msg": f"正在生成第{volume}卷第{chapter}章... (模式: {wf_mode})"}, ensure_ascii=False) + "\n\n"
 
         try:
-            from scene_writer import (
-                load_chapter_outline, load_entity_cards, load_world_setting,
-                load_previous_chapter, load_history_chapters, load_next_chapter_outline,
-                load_writing_guide, _load_structured_outline_chapter, _load_foreshadowing_context
-            )
+            from scene_writer import build_chapter_prompt
             from utils.config import MANUSCRIPTS_DIR
-            import json as _json
+            from utils.llm_client import _get_client, get_task_client, get_task_model, _llm_temperature, _llm_frequency_penalty, _llm_presence_penalty, _llm_top_p
 
-            client = _get_task_client("writing")  # 正文用 Gemma4
-            outline = load_chapter_outline(volume, chapter)
-            if not outline:
+            # ── 多 Agent 流水线（standard/deep 模式） ──
+            if use_agent and wf_mode in ("standard", "deep"):
+                yield "data: " + _json.dumps({"type": "status", "msg": "启动多 Agent 协作流水线..."}, ensure_ascii=False) + "\n\n"
+
+                from scene_writer import load_chapter_outline
+                outline = load_chapter_outline(volume, chapter)
+                if not outline:
+                    yield "data: " + _json.dumps({"type": "error", "msg": "找不到章节大纲"}, ensure_ascii=False) + "\n\n"
+                    return
+
+                # 按阶段输出进度
+                stages = ["Architect", "Scribe", "Editor", "Polisher", "Gatekeeper"]
+                for i, stage in enumerate(stages):
+                    yield "data: " + _json.dumps({"type": "agent_progress", "stage": stage, "progress": (i+1)/len(stages)}, ensure_ascii=False) + "\n\n"
+
+                # 注入流派/风格到 outline，Agent 流水线各阶段都会看到
+                genre_style = _build_genre_style_injection(cfg)
+                if genre_style:
+                    outline["_genre_style_injection"] = genre_style
+
+                from skills.wf_mo_shen_workflow.skill import WfMoShenWorkflowSkill
+                from core.novel_context import NovelContext
+                ctx = NovelContext()
+                wf = WfMoShenWorkflowSkill(ctx)
+                wf._config = cfg
+                wf.current_mode = wf_mode
+                pipeline_result = wf.run_agent_pipeline(outline, chapter)
+
+                full_content = pipeline_result["final_text"]
+                gatekeeper = pipeline_result["gatekeeper_score"]
+                yield "data: " + _json.dumps({
+                    "type": "agent_result",
+                    "score": gatekeeper.get("final_score", 0),
+                    "dimensions": gatekeeper.get("dimensions", {}),
+                    "revision_rounds": pipeline_result["revision_rounds"],
+                }, ensure_ascii=False) + "\n\n"
+
+                # Post-processing (hooks + quality gate)
+                from scene_writer import post_process_chapter
+                ch_file, gate_verdict, gate_guidance = post_process_chapter(
+                    volume, chapter, full_content)
+                yield "data: " + _json.dumps({
+                    "type": "complete", "chapter": chapter,
+                    "words": len(full_content), "path": str(ch_file),
+                    "gate_verdict": gate_verdict or "none",
+                }, ensure_ascii=False) + "\n\n"
+                return
+
+            # ── 单 LLM 流水线（quick 模式） ──
+            client = get_task_client("writing")
+            model = get_task_model("writing")
+            prompt = build_chapter_prompt(volume, chapter)
+            if not prompt:
                 yield "data: " + _json.dumps({"type": "error", "msg": "找不到章节大纲"}, ensure_ascii=False) + "\n\n"
                 return
 
-            chapter_title = outline.get("title", f"第{chapter}章")
-            overview = outline.get("overview", "")
-            entity_list = outline.get("entity_list", [])
+            # 使用新参数
+            temp = _llm_temperature("writing")
+            freq_pen = _llm_frequency_penalty("writing")
+            pres_pen = _llm_presence_penalty("writing")
+            top_p = _llm_top_p("writing")
 
-            entities = load_entity_cards(entity_list)
-            world_setting = load_world_setting()
-            prev_chapter = load_previous_chapter(volume, chapter)
-            history_chapters = load_history_chapters(volume, chapter, count=3)
-            next_outline = load_next_chapter_outline(volume, chapter)
-            writing_guide = load_writing_guide(volume)
-
-            # Build prompt (same as scene_writer.py)
-            prompt_parts = [
-                f"【章节大纲】:\n标题：{chapter_title}\n概述：{overview}\n",
-                f"【参与者实体】:\n角色：{_json.dumps(entities.get('characters',[]), ensure_ascii=False, indent=2)}\n",
-                f"【场景】: {_json.dumps(entities.get('scenes',[]), ensure_ascii=False, indent=2)}\n",
-            ]
-            if world_setting:
-                content = world_setting.get("content", world_setting)
-                prompt_parts.append(f"【世界观设定】:\n{content.get('world_view','')}\n")
-            if history_chapters:
-                prompt_parts.append(f"【历史章节剧情回顾】:\n{history_chapters}\n")
-            if prev_chapter:
-                prompt_parts.append(f"【前章结尾】:\n{prev_chapter}\n")
-            if next_outline:
-                prompt_parts.append(f"【下一章预告】:\n{next_outline.get('title','')}：{next_outline.get('overview','')}\n")
-            if writing_guide:
-                prompt_parts.append(f"【写作指南】:\n{writing_guide}\n")
-
-            # Structured outline detail
-            struct_outline = _load_structured_outline_chapter(chapter)
-            if struct_outline:
-                detail_parts = []
-                if struct_outline.get("summary"):
-                    detail_parts.append(f"【本章概要】: {struct_outline['summary']}")
-                if struct_outline.get("scenes_text") or struct_outline.get("scenes"):
-                    scenes = struct_outline.get("scenes_text") or str(struct_outline.get("scenes",""))
-                    detail_parts.append(f"【场景细纲】:\n{scenes}")
-                if struct_outline.get("satisfaction_beat"):
-                    detail_parts.append(f"【本章爽点】: {struct_outline['satisfaction_beat']}")
-                if struct_outline.get("ending_hook"):
-                    detail_parts.append(f"【章末钩子(必须!)】: {struct_outline['ending_hook']}")
-                if detail_parts:
-                    prompt_parts.append("【详细细纲 — 严格遵循】:\n" + "\n".join(detail_parts))
-
-            # Foreshadowing
-            fs_ctx = _load_foreshadowing_context(chapter)
-            if fs_ctx:
-                prompt_parts.append(f"【伏笔提醒】:\n{fs_ctx}")
-
-            prompt_parts.append(
-                f"【写作要求】:\n1. 第一行必须是格式：# 第{chapter}章 标题名\n"
-                f"2. 承前启后，严格执行详细细纲的场景分解\n"
-                f"3. 爽点到位，章末保留钩子\n"
-                f"4. 如有伏笔提醒务必处理\n5. 约6000字\n\n请开始写作：\n"
-            )
-            prompt = "\n".join(prompt_parts)
-
-            # Stream generation
+            from utils.prompt_loader import writing_prompt
+            system_prompt = writing_prompt() + _build_genre_style_injection(cfg)
             full_content = ""
             stream = client.chat.completions.create(
-                model="auto", temperature=0.8, max_tokens=8192, stream=True,
-                messages=[{"role":"user","content":prompt}],
+                model=model,
+                temperature=temp,
+                frequency_penalty=freq_pen,
+                presence_penalty=pres_pen,
+                top_p=top_p,
+                max_tokens=8192,
+                stream=True,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
                 extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
             for chunk in stream:
@@ -246,14 +437,17 @@ async def write_stream(request: Request):
                     full_content += text
                     yield "data: " + _json.dumps({"type": "stream", "text": text}, ensure_ascii=False) + "\n\n"
 
-            # Save
+            # Post-processing (hooks + quality gate) — shared pipeline
             if full_content:
-                ms_dir = Path(MANUSCRIPTS_DIR) / f"vol_{volume:02d}"
-                ms_dir.mkdir(parents=True, exist_ok=True)
-                ch_file = ms_dir / f"ch_{chapter:03d}_final.md"
-                ch_file.write_text(full_content, encoding="utf-8")
-                yield "data: " + _json.dumps({"type": "done", "chapter": chapter, "words": len(full_content), "path": str(ch_file)}, ensure_ascii=False) + "\n\n"
-                yield "data: " + _json.dumps({"type": "complete", "chapter": chapter, "words": len(full_content)}, ensure_ascii=False) + "\n\n"
+                from scene_writer import post_process_chapter
+                ch_file, gate_verdict, _ = post_process_chapter(volume, chapter, full_content)
+                yield "data: " + _json.dumps({
+                    "type": "done", "chapter": chapter, "words": len(full_content),
+                    "path": str(ch_file), "gate_verdict": gate_verdict or "none",
+                }, ensure_ascii=False) + "\n\n"
+                yield "data: " + _json.dumps({
+                    "type": "complete", "chapter": chapter, "words": len(full_content),
+                }, ensure_ascii=False) + "\n\n"
             else:
                 yield "data: " + _json.dumps({"type": "error", "msg": "生成返回空内容"}, ensure_ascii=False) + "\n\n"
         except Exception as e:
@@ -351,6 +545,18 @@ def _compile_world(base: Path):
     compiled = header + "\n\n" + "\n\n---\n\n".join(sections) if sections else header
     world_file.write_text(compiled, encoding="utf-8")
 
+def _extract_port(base_url: str) -> int:
+    """Safely extract port from a URL string."""
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(base_url)
+        if parsed.port:
+            return parsed.port
+        # Fallback: try to parse from netloc
+        return 0
+    except Exception:
+        return 0
+
 def _now():
     from datetime import datetime
     return datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -379,14 +585,21 @@ async def generate_file(request: Request):
         doc_type = "文档"
         example = ""
 
-    from utils.llm_client import get_client_for
+    from utils.llm_client import get_client_for, get_task_model, _llm_temperature, _llm_frequency_penalty, _llm_presence_penalty, _llm_top_p
     client = _get_task_client("planning")  # 设定/人物策划用 Qwen3.6
 
-    system_prompt = f"""你是专业的中文网文{doc_type}设计师。请生成一份详细的{doc_type}。
+    planning_ref = _planning_ref()
+    planning_context = f"\n\n**写作参考（市场趋势+写作技巧+叙事手法，必须参考融入设计）:**\n{planning_ref[:3000]}" if planning_ref else ""
+
+    from utils.prompt_loader import planning_prompt
+    system_prompt = planning_prompt() + f"""
+
+当前任务：生成一份详细的{doc_type}
 
 小说类型：{genre}
 当前主题：{topic}
 用户要求：{instructions}
+{planning_context}
 
 要求：
 - 结构完整，参考网文行规
@@ -407,9 +620,12 @@ async def generate_file(request: Request):
                 messages.append({"role": "user", "content": f"生成一份{genre}小说的{doc_type}：{topic}"})
 
             stream = client.chat.completions.create(
-                model="auto",
+                model=get_task_model("planning"),
+                temperature=_llm_temperature("planning"),
+                frequency_penalty=_llm_frequency_penalty("planning"),
+                presence_penalty=_llm_presence_penalty("planning"),
+                top_p=_llm_top_p("planning"),
                 messages=messages,
-                temperature=0.8,
                 max_tokens=4096,
                 stream=True,
                 extra_body={"chat_template_kwargs": {"enable_thinking": False}},
@@ -528,8 +744,10 @@ async def revise_file(request: Request):
     from utils.llm_client import get_client_for
     client = _get_task_client("writing")  # 正文修改用 Gemma4
 
-    system_prompt = f"""你是一个专业的中文网文编辑。用户在修改一份{doc_type}，需要你的帮助。
-你的任务：根据用户的修改指令，输出修改后的完整内容。
+    from utils.prompt_loader import editing_prompt
+    system_prompt = editing_prompt() + f"""
+
+当前任务：用户要修改一份{doc_type}文档。
 规则：
 1. 只修改用户指定的部分，其他部分保持不变
 2. 如果用户要求润色/扩展某个段落，保留原有结构
@@ -546,9 +764,12 @@ async def revise_file(request: Request):
     async def generate():
         try:
             stream = client.chat.completions.create(
-                model="auto",
+                model=get_task_model("planning"),
+                temperature=_llm_temperature("planning"),
+                frequency_penalty=_llm_frequency_penalty("planning"),
+                presence_penalty=_llm_presence_penalty("planning"),
+                top_p=_llm_top_p("planning"),
                 messages=messages,
-                temperature=0.7,
                 max_tokens=4096,
                 stream=True,
                 extra_body={"chat_template_kwargs": {"enable_thinking": False}},
@@ -571,7 +792,7 @@ async def discover_models():
     Calls /v1/models on each port, matches against config alt_models keys."""
     import httpx
     cfg = load_cfg()
-    scan_ports = cfg.get("llm", {}).get("scan_ports", [1234])
+    scan_ports = cfg.get("llm", {}).get("scan_ports", [61183])
     default_key = cfg.get("llm", {}).get("default_model", "")
     alt = cfg.get("llm", {}).get("alt_models", {})
     models = {}
@@ -590,7 +811,7 @@ async def discover_models():
                         if _is_ignored_model(mid): continue
                         key = _model_key_from_id(mid, port)
                         # Use alt_model label if key matches alt_models
-                        label = alt[key]["label"] if key in alt else _model_label(mid)
+                        label = mid  # use original model ID directly
                         # Dedup: prefer shorter model_id (e.g. 'qwen3.6-27b' over 'qwen/qwen3.6-27b')
                         if key in seen_key_ids:
                             prev = seen_key_ids[key]
@@ -619,7 +840,7 @@ async def discover_models():
                 "key": key,
                 "id": cfg_m.get("id", key),
                 "label": cfg_m.get("label", key),
-                "port": int(cfg_m.get("base_url", "").split(":")[2].split("/")[0]) if ":" in cfg_m.get("base_url", "") else 0,
+                "port": _extract_port(cfg_m.get("base_url", "")),
                 "base_url": cfg_m.get("base_url", ""),
             }
 
@@ -671,30 +892,6 @@ def _match_alt_model(model_id_lower: str) -> str | None:
             return alt_key
     return None
 
-def _model_label(model_id: str) -> str:
-    """Create a human-readable label from model ID"""
-    mid = model_id.lower()
-    # Ordered from most specific to least specific
-    known = [
-        ("coder-next", "Coder-Next 推理"),
-        ("qwen3-coder-next", "Coder-Next 推理"),
-        ("qwen3-coder-30b", "Coder-30B 编程"),
-        ("qwen3-coder", "Coder 编程"),
-        ("qwen3.6-uncensored-aggressive", "Qwen3.6 激进无审查"),
-        ("qwen3.6-uncensored", "Qwen3.6 无审查"),
-        ("qwen3.6-27b", "Qwen3.6 大纲策划"),
-        ("qwen3.6", "Qwen3.6 大纲策划"),
-        ("qwen3.5", "Qwen3.5 写手"),
-        ("gemma4", "Gemma4 正文执笔"),
-        ("gemma-4", "Gemma4 正文执笔"),
-        ("gpt-oss", "GPT-OSS 超大杯"),
-        ("deepseek", "DeepSeek 推理"),
-    ]
-    for kw, label in known:
-        if kw in mid:
-            return label
-    return model_id[:40]
-
 def _get_task_client(task: str):
     """Get LLM client for a specific task type (planning/writing/reasoning).
     Delegates to llm_client.get_task_client()."""
@@ -720,7 +917,7 @@ async def switch_model(request: Request):
 
     # Re-discover models to get the port for this key
     cfg = load_cfg()
-    scan_ports = cfg.get("llm", {}).get("scan_ports", [1234])
+    scan_ports = cfg.get("llm", {}).get("scan_ports", [61183])
 
     # First check alt_models
     alt = cfg.get("llm", {}).get("alt_models", {})
@@ -877,13 +1074,16 @@ async def generate_chapter_outline(request: Request):
     if world_file.exists():
         world_ctx = world_file.read_text(encoding="utf-8")[:2000]
 
-    from utils.llm_client import get_client_for
+    from utils.llm_client import get_client_for, get_task_model, _llm_temperature, _llm_frequency_penalty, _llm_presence_penalty, _llm_top_p
     client = _get_task_client("planning")  # 设定/人物策划用 Qwen3.6
+
+    planning_ref = _planning_ref()
+    planning_context = f"\n\n写作参考（市场趋势+技巧+叙事）：\n{planning_ref[:3000]}" if planning_ref else ""
 
     system_prompt = f"""你是专业的网文细纲设计师。为第{chap_num}章生成详细写作细纲。
 
 小说：{novel_title} | 类型：{genre}
-世界观参考：{world_ctx[:1500]}
+世界观参考：{world_ctx[:1500]}{planning_context}
 
 输出格式：
 # 第{chap_num}章: [章节标题]
@@ -926,7 +1126,12 @@ async def generate_chapter_outline(request: Request):
         try:
             user_msg = f"请为第{chap_num}章生成详细写作细纲。字数目标：3000字。"
             stream = client.chat.completions.create(
-                model="auto", temperature=0.7, max_tokens=3072, stream=True,
+                model=get_task_model("planning"),
+                temperature=_llm_temperature("planning"),
+                frequency_penalty=_llm_frequency_penalty("planning"),
+                presence_penalty=_llm_presence_penalty("planning"),
+                top_p=_llm_top_p("planning"),
+                max_tokens=3072, stream=True,
                 messages=[{"role":"system","content":system_prompt},{"role":"user","content":user_msg}],
                 extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
@@ -1032,8 +1237,8 @@ async def generate_foreshadowing(request: Request):
     if not chapter_content:
         return {"error": "chapter content required"}
 
-    from utils.llm_client import get_client_for
-    client = _get_task_client("planning")  # 设定/人物策划用 Qwen3.6
+    from utils.llm_client import get_client_for, get_task_model, _llm_temperature, _llm_frequency_penalty, _llm_presence_penalty, _llm_top_p
+    client = get_task_client("reasoning")  # 伏笔检测用推理模型
 
     system_prompt = f"""你是专业的网文编辑，擅长识别和管理伏笔。请扫描以下第{chapter_num}章内容，找出其中可能埋下的伏笔。
 
@@ -1049,7 +1254,12 @@ async def generate_foreshadowing(request: Request):
 
     try:
         response = client.chat.completions.create(
-            model="auto", temperature=0.5, max_tokens=1024,
+            model=get_task_model("reasoning"),
+            temperature=_llm_temperature("reasoning"),
+            frequency_penalty=_llm_frequency_penalty("reasoning"),
+            presence_penalty=_llm_presence_penalty("reasoning"),
+            top_p=_llm_top_p("reasoning"),
+            max_tokens=1024,
             messages=[
                 {"role":"system","content":system_prompt},
                 {"role":"user","content":chapter_content[-6000:]}
@@ -1291,39 +1501,56 @@ async def deai_rewrite(request: Request):
     engine.on_init()
     detection = engine.analyze(full_text)
 
-    # Build rewrite instructions based on detection
+    # Build rewrite instructions based on detection (六层分析)
     issues = []
-    for word, count in detection.get("word_counts", {}).items():
+    for word, count in detection.get("flagged_words", {}).items():
         if count >= 3:
-            issues.append(f"「{word}」出现{count}次，属于AI高频用词，请替换或删除大部分")
-    for pattern, label in detection.get("pattern_matches", []):
-        issues.append(f"句式「{label}」模板化严重，请改写自然")
+            issues.append(f"「{word}」出现{count}次，AI高频词")
+    for pattern in list(detection.get("flagged_patterns", {}).keys())[:5]:
+        issues.append(f"句式「{pattern}」模板化严重")
+    # L3-L6 issues
+    if detection.get("adj_density", {}).get("score", 100) < 50:
+        issues.append(f"修饰词密度过高({detection['adj_density']['density']}/300字)")
+    if detection.get("idiom_density", {}).get("score", 100) < 50:
+        issues.append(f"四字成语堆砌({detection['idiom_density']['density']}/500字)")
+    for issue in detection.get("para_variation", {}).get("issues", []):
+        issues.append(issue)
+    for issue in detection.get("punct_rhythm", {}).get("issues", []):
+        issues.append(issue)
 
-    issues_text = "\n".join(f"- {i}" for i in issues[:10]) if issues else "无显著问题"
+    issues_text = "\n".join(f"- {i}" for i in issues[:12]) if issues else "无显著问题"
 
-    from utils.llm_client import get_client_for
-    client = _get_task_client("writing")  # 去AI改写用 Gemma4
+    from utils.llm_client import get_task_client, get_task_model, _llm_temperature, _llm_frequency_penalty, _llm_presence_penalty, _llm_top_p
+    client = get_task_client("writing")
+    model = get_task_model("writing")
 
-    system_prompt = f"""你是一个专业的中文网文编辑，擅长**去AI味**改写。
-你的任务是：把AI生成的模板化文本，改写成**像人写的**网文。
+    from utils.prompt_loader import polishing_prompt
+    system_prompt = polishing_prompt() + f"""
 
-改写原则：
-1. 删除所有「不禁」「缓缓」「竟然」「顿时」「不由得」「仿佛」等AI高频词
-2. 打破「嘴角上扬」「心中一震」「深吸一口气」等模板句式
-3. 对话要自然，不同人物有不同说话风格
-4. 动作描写要具体，不要用模糊的套话
-5. 保持原文的剧情走向和核心信息不变
-6. 保留网文的爽感和节奏
+**当前任务：去AI味改写**
 
-检测到的问题：
+检测到的问题（六层检测）：
 {issues_text}
 
-请直接输出改写后的完整章节，不要解释你改了什么。章节号保持不变。"""
+改写原则：
+1. 删除AI高频词（不禁/缓缓/微微/顿时/忽然/仿佛/某种 等）
+2. 打破模板句式（嘴角上扬/心中一震/深吸一口气/倒吸一口凉气 等）
+3. 动作留白：只保留关键帧，删除中间过渡动作
+4. 感官侵入：多写触觉/嗅觉/温度，少用视觉描述
+5. 对话必须有意推进，每轮承载事实/规矩/代价之一
+6. 情绪不直说，用动作和环境呈现
+7. 保持原文剧情走向，直接输出改写后的完整正文"""
 
     async def generate():
         try:
+            temp = _llm_temperature("deai")
+            freq = _llm_frequency_penalty("deai")
+            pres = _llm_presence_penalty("deai")
+            tp = _llm_top_p("deai")
             stream = client.chat.completions.create(
-                model="auto", temperature=0.7, max_tokens=min(len(full_text) * 2, 8192), stream=True,
+                model=model, temperature=temp, frequency_penalty=freq,
+                presence_penalty=pres, top_p=tp, max_tokens=min(len(full_text) * 2, 8192),
+                stream=True,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"请重写以下章节，去除AI味：\n\n{full_text[-12000:]}"}
@@ -1394,7 +1621,8 @@ async def workshop_chat(request: Request):
             novel_dir = cfg.get("workspace", {}).get("novel_name", "")
             base = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
 
-            system = f"""你是一位资深的网络小说策划师，擅长帮作者把模糊的灵感打磨成完整的故事方案。
+            from utils.prompt_loader import brainstorm_prompt
+            system = brainstorm_prompt() + """
 
 你的工作方式：
 - 先理解作者的核心创意，问 1-2 个关键问题帮助聚焦
@@ -1461,5 +1689,29 @@ async def plan_novel(request: Request):
     return {"ok": True, "output": result.stdout + result.stderr}
 
 
+def _load_prompt_refs(*fnames: str) -> str:
+    """Load specified reference files and join them."""
+    parts = []
+    for fname in fnames:
+        ref_path = Path(__file__).parent.parent / "prompts" / fname
+        if ref_path.exists():
+            parts.append(ref_path.read_text(encoding="utf-8"))
+    return "\n\n".join(parts)
+
+def _planning_ref() -> str:
+    """策划阶段：市场趋势 + 写作教程 + 叙事手法"""
+    return _load_prompt_refs(
+        "genre-market-reference-2026.md",
+        "bilibili-writing-crash-course.md",
+        "narrative-pov-immersion.md"
+    )
+
+def _writing_ref() -> str:
+    """正文阶段：只注入写作技巧和叙事手法，不注入市场趋势（正文应按大纲细纲走）"""
+    return _load_prompt_refs(
+        "bilibili-writing-crash-course.md",
+        "narrative-pov-immersion.md"
+    )
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8765, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=8765, log_level="info")
