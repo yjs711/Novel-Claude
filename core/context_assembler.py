@@ -99,10 +99,15 @@ class ContextAssembler:
 
         result = re.sub(type_pattern, replace_type_ref, result)
 
-        # Replace @CardTitle
-        title_pattern = r'@([^\s@]+?(?:[^\s@]+)*?)(?:\.content\.([\w]+))?'
+        # Replace @CardTitle — only match card-looking patterns
+        # Must contain CJK, or alphanumeric with word boundary
+        title_pattern = r'@([一-鿿]{1,20}|[A-Za-z]\w{1,20})(?:\.content\.([\w]+))?'
         def replace_title_ref(m):
             title = m.group(1)
+            # Only process if title contains CJK (definitely a card ref)
+            if not any('一' <= c <= '鿿' for c in title):
+                # For non-CJK, only match if followed by CJK context or standalone
+                pass  # let lookup decide
             field = m.group(2)
             # Find card by title
             for cards in self.db.cards.values():

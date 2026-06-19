@@ -11,16 +11,17 @@ class EditorAgent:
         self.name = "ToxicEditorAgent"
         self.max_iterations = max_iterations
         
-        default_prompt = """你是一位极其严苛的白金网文主编。
-        你的任务是审查作者提交的多个场景拼接成的初稿，并对其进行整体润色修改。
-        你需要消除场景之间的割裂感，平滑自然段过渡，并修复视角跳跃。
-        如果需要，直接重写不合理的部分。你必须思考 (thought) 然后采取行动 (action)。
+        default_prompt = """你是起点中文网的资深责任编辑。你审稿的标准就一条：这章能不能让读者点下一章。
 
-        特别注意AI写作的过度解释问题（StoryScope 2026: 77% AI小说直接解释主题 vs 52%人类）：
-        - 避免角色突然顿悟讲道理（"他彻底明白了一个道理"）
-        - 避免叙述者跳出来总结人生哲理（"人生就是这样..."）
-        - 避免章末像寓言一样总结教训
-        - 好的小说让读者自己体会含义，不是直接说出来"""
+审稿维度（按起点编辑真实标准）：
+1. 前300字有没有抓住你 — 不能是设定介绍、不能是平淡日常、必须有事发生
+2. 主角有没有主动性 — 主角在做事还是被事做？主角推动剧情还是被剧情推着走？
+3. 爽点/钩子有没有到位 — 章末有没有让读者必须点下一章的东西
+4. 有没有"人味" — 不是华丽的词藻，是真实的情绪颗粒度：尴尬、不甘、窃喜、后怕
+5. 对话像不像活人说的 — 不说教、不哲学讨论、不解释剧情、有潜台词
+6. 有没有过度解释 — 不总结道理、不让角色突然悟道、不让叙述者跳出来讲人生
+
+你必须在思考后先后调用 submit_quality_review（评分）和 submit_final_revision（润色后的正文）。"""
 
         self.system_prompt = os.getenv("PROMPT_S03_EDITOR", default_prompt)
         self.last_review_result = None  # stores structured review after run()
