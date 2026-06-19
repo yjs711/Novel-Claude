@@ -1782,6 +1782,99 @@ async def save_storyform(request: Request):
     return {"ok": True, "storyform": sf.to_dict()}
 
 
+# ── export ────────────────────────────────────────────────────────────────────
+
+@app.get("/api/export/check")
+async def export_check():
+    """Check if pandoc is available for export."""
+    from utils.exporter import check_pandoc
+    return check_pandoc()
+
+
+@app.post("/api/export")
+async def export_manuscript_api(request: Request):
+    """Export manuscript to EPUB/PDF."""
+    data = await request.json()
+    fmt = data.get("format", "epub")
+    volume = data.get("volume")
+    author = data.get("author", "")
+    cover = data.get("cover", "")
+    from utils.exporter import export_manuscript, export_all_volumes
+    from utils.config import MANUSCRIPTS_DIR
+    cfg = load_cfg()
+    title = cfg.get("workspace", {}).get("novel_name", "Novel")
+
+    if volume:
+        result = export_manuscript(MANUSCRIPTS_DIR, title, ".", fmt, author, cover, volume)
+    else:
+        results = export_all_volumes(MANUSCRIPTS_DIR, title, ".", fmt, author, cover)
+        result = results[0] if results else None
+        if not results:
+            result = export_manuscript(MANUSCRIPTS_DIR, title, ".", fmt, author, cover)
+
+    if result:
+        return {"ok": True, "path": str(result), "size_kb": round(result.stat().st_size / 1024, 1)}
+    return {"ok": False, "error": "Export failed (pandoc not found or no chapters)"}
+
+
+# ── analyze ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/analyze")
+async def analyze_manuscript_api(volume: int = None):
+    """Get full manuscript analysis report."""
+    from core.manuscript_analyzer import analyze_manuscript
+    from utils.config import MANUSCRIPTS_DIR
+    cfg = load_cfg()
+    title = cfg.get("workspace", {}).get("novel_name", "Manuscript")
+    report = analyze_manuscript(MANUSCRIPTS_DIR, title, volume)
+    if not report:
+        return {"ok": False, "error": "No chapters found"}
+    return {"ok": True, "report": report.to_dict()}
+
+
+# ── snapshots ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/snapshots")
+async def list_snapshots_api():
+    """List all revision snapshots."""
+    from core.revision_snapshot import list_snapshots
+    return {"snapshots": list_snapshots()}
+
+
+@app.post("/api/snapshots")
+async def save_snapshot_api(request: Request):
+    """Save a new revision snapshot."""
+    data = await request.json()
+    from core.revision_snapshot import save_snapshot
+    from utils.config import MANUSCRIPTS_DIR
+    snap = save_snapshot(MANUSCRIPTS_DIR, data.get("label", ""), data.get("volume"))
+    if snap:
+        return {"ok": True, "snapshot": snap.to_dict()}
+    return {"ok": False, "error": "No chapters to snapshot"}
+
+
+@app.post("/api/snapshots/diff")
+async def diff_snapshots_api(request: Request):
+    """Compare two snapshots, return HTML diff."""
+    data = await request.json()
+    from core.revision_snapshot import diff_snapshots
+    html = diff_snapshots(
+        data.get("snap1", ""), data.get("snap2", ""),
+        data.get("chapter", 1), "html",
+    )
+    if html:
+        return {"ok": True, "html": html}
+    return {"ok": False, "error": "Snapshots not found"}
+
+
+@app.delete("/api/snapshots/{snapshot_id}")
+async def delete_snapshot_api(snapshot_id: str):
+    """Delete a snapshot."""
+    from core.revision_snapshot import delete_snapshot
+    ok = delete_snapshot(snapshot_id)
+    return {"ok": ok}
+
+
 @app.get("/api/logs")
 async def get_logs(lines: int = 50, level: str = None):
     """Get recent log entries from the daily log file."""

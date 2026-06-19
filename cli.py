@@ -536,6 +536,162 @@ if __name__ == '__main__':
         wait_for_background_tasks()
 
 
+# ── export ────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.option('--format', '-f', type=str, default='epub', help='epub or pdf')
+@click.option('--volume', '-v', type=int, default=None, help='Export specific volume')
+@click.option('--author', '-a', type=str, default='', help='Author name')
+@click.option('--cover', '-c', type=str, default='', help='Cover image path')
+@click.option('--output', '-o', type=str, default='.', help='Output directory')
+def export(format, volume, author, cover, output):
+    """Export manuscript to EPUB or PDF (requires pandoc)"""
+    from utils.exporter import export_manuscript, export_all_volumes, check_pandoc
+    from utils.config import MANUSCRIPTS_DIR
+
+    status = check_pandoc()
+    if not status["available"]:
+        print(f"[ERROR] pandoc not found. {status['install_hint']}")
+        return
+    print(f"Pandoc: {status.get('version', 'found')}")
+
+    cfg = load_cfg() if 'load_cfg' in dir() else {}
+    title = cfg.get("workspace", {}).get("novel_name", "Novel")
+    if 'load_cfg' not in dir():
+        try:
+            from utils.config_loader import get_config
+            title = get_config("workspace.novel_name", default="Novel")
+        except Exception:
+            pass
+
+    if volume:
+        result = export_manuscript(MANUSCRIPTS_DIR, title, output, format, author, cover, volume)
+    else:
+        results = export_all_volumes(MANUSCRIPTS_DIR, title, output, format, author, cover)
+        if not results:
+            result = export_manuscript(MANUSCRIPTS_DIR, title, output, format, author, cover)
+
+    if 'result' in dir() and result:
+        print(f"[OK] Exported: {result}")
+
+
+# ── analyze ───────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.option('--volume', '-v', type=int, default=None, help='Analyze specific volume')
+@click.option('--json', '-j', 'as_json', is_flag=True, default=False, help='JSON output')
+def analyze(volume, as_json):
+    """Analyze manuscript: pacing, POV, dialogue, prose economy"""
+    from core.manuscript_analyzer import analyze_manuscript
+    from utils.config import MANUSCRIPTS_DIR
+
+    cfg = load_cfg() if 'load_cfg' in dir() else {}
+    title = cfg.get("workspace", {}).get("novel_name", "Manuscript")
+
+    report = analyze_manuscript(MANUSCRIPTS_DIR, title, volume)
+    if not report:
+        print("[ERROR] No chapters found to analyze")
+        return
+
+    if as_json:
+        import json as _json
+        print(_json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+        return
+
+    print(f"\n{'='*60}")
+    print(f"  Manuscript Analysis: {report.title}")
+    print(f"  {report.total_chapters} chapters, {report.total_words:,} words")
+    print(f"{'='*60}")
+
+    print(f"\n[Averages]")
+    print(f"  Chapter length: {report.avg_chapter_len:,.0f} words")
+    print(f"  Dialogue ratio: {report.avg_dialogue_ratio:.0%}")
+    print(f"  Urgency score:  {report.avg_urgency:.1f}/10")
+    print(f"  Adverb density: {report.avg_adverb_density:.1f}/1000chars")
+    print(f"  AI patterns:    {report.avg_ai_patterns:.0f}/chapter")
+    print(f"  Over-explain:   {report.avg_over_explain:.0f}/chapter")
+
+    if report.pacing_issues:
+        print(f"\n[Pacing Issues] ({len(report.pacing_issues)})")
+        for issue in report.pacing_issues[:10]:
+            print(f"  - {issue}")
+
+    if report.economy_issues:
+        print(f"\n[Economy Issues] ({len(report.economy_issues)})")
+        for issue in report.economy_issues[:10]:
+            print(f"  - {issue}")
+
+    if report.dead_zones:
+        print(f"\n[Dead Zones] Chapters: {', '.join(str(c) for c in report.dead_zones[:10])}")
+
+    # Per-chapter summary table
+    print(f"\n{'Ch':>4} {'Words':>6} {'Dial%':>6} {'SentL':>6} {'Urgency':>8} {'AI':>4} {'Explain':>8}")
+    print("-" * 55)
+    for c in report.chapters[:30]:
+        print(f"{c.chapter_num:>4} {c.word_count:>6} {c.dialogue_ratio:>5.0%} "
+              f"{c.avg_sentence_len:>5.0f} {c.urgency_score:>7.1f} "
+              f"{c.ai_pattern_count:>4} {c.over_explain_count:>8}")
+
+
+# ── snapshot ──────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.argument('action', type=str, default='list')
+@click.option('--label', '-l', type=str, default='', help='Snapshot label')
+@click.option('--volume', '-v', type=int, default=None)
+@click.option('--snap1', type=str, default='', help='First snapshot ID for diff')
+@click.option('--snap2', type=str, default='', help='Second snapshot ID for diff')
+@click.option('--chapter', '-c', type=int, default=1, help='Chapter for diff')
+@click.option('--output', '-o', type=str, default='', help='HTML output file')
+def snapshot(action, label, volume, snap1, snap2, chapter, output):
+    """Manage manuscript revision snapshots.
+    Actions: save, list, diff, delete"""
+    from core.revision_snapshot import (save_snapshot, list_snapshots,
+                                         diff_snapshots, delete_snapshot)
+    from utils.config import MANUSCRIPTS_DIR
+
+    if action == 'save':
+        snap = save_snapshot(MANUSCRIPTS_DIR, label, volume)
+        if snap:
+            print(f"[OK] Snapshot saved: {snap.id} ({snap.label})")
+        else:
+            print("[ERROR] No chapters to snapshot")
+
+    elif action == 'list':
+        snaps = list_snapshots()
+        if not snaps:
+            print("[INFO] No snapshots found")
+            return
+        for s in snaps[:20]:
+            print(f"  {s['id']} | {s['created'][:19]} | {s['label'][:30]:30s} | "
+                  f"{s['chapter_count']}ch | {s['total_words']:,} chars")
+
+    elif action == 'diff':
+        if not snap1 or not snap2:
+            print("[ERROR] Provide --snap1 and --snap2 IDs")
+            return
+        html = diff_snapshots(snap1, snap2, chapter, "html")
+        if not html:
+            print("[ERROR] Snapshots not found or chapter not in snapshots")
+            return
+        out_path = output or f"snap_diff_{snap1[:8]}_vs_{snap2[:8]}_ch{chapter}.html"
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(html)
+        print(f"[OK] Diff written to {out_path}")
+
+    elif action == 'delete':
+        if not snap1:
+            print("[ERROR] Provide snapshot ID as --snap1")
+            return
+        if delete_snapshot(snap1):
+            print(f"[OK] Deleted {snap1}")
+        else:
+            print(f"[ERROR] Snapshot {snap1} not found")
+
+    else:
+        print(f"[ERROR] Unknown action: {action}. Use: save, list, diff, delete")
+
+
 # ── log management ─────────────────────────────────────────────────────
 
 @cli.command()
