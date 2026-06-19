@@ -2,7 +2,7 @@
   "llm": {
     "provider": "lmstudio",
     "model": "qwen3.6-27b-uncensored",
-    "base_url": "http://localhost:61183/v1",
+    "base_url": "http://127.0.0.1:61183/v1",
     "timeout": 600,
     "api_key": "lm-studio-no-auth-needed",
     "flash_model": "auto",
@@ -22,13 +22,17 @@
       "qwen3.6-27b-ud": {
         "purpose": "writing",
         "label_hint": "27B UD-Q8_K_XL MTP — 高质量正文/润色"
+      },
+      "qwen3.6-35b-opus": {
+        "base_url": "http://127.0.0.1:61183/v1",
+        "label": "qwen3.6-35b-opus"
       }
     },
-    "default_model": "qwen3.6-27b-uncensored",
+    "default_model": "qwen3.6-35b-opus",
     "task_models": {
       "planning": "qwen3.6-27b-uncensored",
       "writing": "qwen3.6-27b-uncensored",
-      "reasoning": "qwen3.6-27b-uncensored",
+      "reasoning": "qwen3.6-35b-opus-reasoning",
       "deai": "qwen3.6-27b-uncensored"
     }
   },

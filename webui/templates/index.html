@@ -785,12 +785,18 @@ function apiGet(url) {
   return fetch(url).then(function(r) { return r.ok ? r.json() : null; }).catch(function(e) { showToast('请求失败: ' + e.message, true); return null; });
 }
 
-function apiPost(url, body) {
-  return fetch(url, {
+function apiPost(url, body, timeoutMs) {
+  var opts = {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(body)
-  }).then(function(r) { return r.ok ? r.json() : null; }).catch(function(e) { showToast('请求失败: ' + e.message, true); return null; });
+  };
+  if (timeoutMs) {
+    var ac = new AbortController();
+    opts.signal = ac.signal;
+    setTimeout(function(){ ac.abort(); }, timeoutMs);
+  }
+  return fetch(url, opts).then(function(r) { return r.ok ? r.json() : null; }).catch(function(e) { showToast('请求失败: ' + e.message, true); return null; });
 }
 
 // ── loadStatus ──
@@ -2045,7 +2051,7 @@ function runLexicalAudit() {
   else { okCount++; }
   if (dashes > 3) { warnings.push('破折号过多 (' + dashes + '次, 建议 ≤3)'); warnCount++; }
   else { okCount++; }
-  if (chengyuDensity > 3) { warnings.push('成语连用密度偏高 (' + chengyuDensity + '/千字)'); warnCount++; }
+  if (chengyuDensity > 120) { warnings.push('四字短语密度偏高 (' + chengyuDensity + '/千字)'); warnCount++; }
   else { okCount++; }
   if (fourCharRatio > 15) { warnings.push('四字词占比偏高 (' + fourCharRatio + '%)'); warnCount++; }
   else { okCount++; }
@@ -2054,7 +2060,7 @@ function runLexicalAudit() {
   html += '<br>句长方差：' + variance + ' (人类参考 >12, AI 典型 <8)';
   html += '<br>冒号密度：' + colonDensity + ' 个/千字 (人类参考 <2, AI 典型 >5)';
   html += '<br>破折号：' + dashes + ' 次 (建议每章 ≤3)';
-  html += '<br>成语连用密度：' + chengyuDensity + ' 次/千字 (人类参考 <1.5, AI 典型 >3)';
+  html += '<br>四字短语密度：' + chengyuDensity + ' 次/千字 (人类参考 <80, AI 典型 >120)';
   html += '<br>四字词占比：' + fourCharRatio + '%';
   html += '<br><br>禁用词命中：' + bannedHits.length + ' 次' + (bannedHits.length > 0 ? '<br>' + bannedHits.join('<br>') : '');
   html += '<br><br><b>总结：</b>' + okCount + ' 项正常 / ' + warnCount + ' 项需关注';
@@ -2147,7 +2153,7 @@ function runChapterAnalysis() {
   out.innerHTML = '<div style="text-align:center;padding:20px"><span style="color:var(--accent)">&#128269; 正在分析第' + ch + '章...</span><br><small style="color:var(--text3)">约需 10-30 秒</small></div>';
   showToast('正在分析章节结构...');
 
-  apiPost('/api/chapter-analysis', {content: text, chapter: ch, genre: genre}).then(function(r) {
+  apiPost('/api/chapter-analysis', {content: text, chapter: ch, genre: genre}, 120000).then(function(r) {
     if (!r || r.error) { out.innerHTML = '<span style="color:var(--danger)">分析失败: ' + (r ? r.error : '未知错误') + '</span>'; return; }
     renderAnalysisResult(r);
   });
