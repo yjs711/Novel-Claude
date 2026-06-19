@@ -304,41 +304,42 @@ async function loadWorld() {
 
 // ── Audit ──
 async function loadAudit() {
-  let html = '<h3>审阅面板</h3>';
-  html += '<div style="display:flex;gap:8px;margin-bottom:12px">';
-  html += '<button class="btn-primary btn-sm" onclick="doContinuity()">连续性检查</button>';
-  html += '<button class="btn-primary btn-sm" onclick="doDeAI()">去AI检测</button>';
-  html += '<button class="btn-secondary btn-sm" onclick="doAnalyze()">全本分析</button>';
-  html += '</div>';
-  html += '<div class="card"><h4>质量门控</h4><div id="auditGate">点击检查…</div></div>';
-  html += '<div class="card" style="margin-top:8px"><h4>多样性</h4><div id="auditDiversity">点击加载…</div></div>';
-  document.getElementById('mainContent').innerHTML = html;
-  const qr = await api('/api/quality-gate');
+  document.getElementById('mainContent').innerHTML = panels['audit'];
+  const [qr, dr] = await Promise.all([api('/api/quality-gate'), api('/api/diversity')]);
   if (qr?.available) {
-    document.getElementById('auditGate').innerHTML = `<pre style="font-size:11px">${qr.formatted||qr.result?.overall_score+'分'}</pre>`;
-  } else { document.getElementById('auditGate').textContent = '暂无门控记录'; }
-  const dr = await api('/api/diversity');
-  if (dr?.score!==undefined) {
-    document.getElementById('auditDiversity').innerHTML = `<b>${dr.score}/100</b> · ${dr.issues?.join('<br>')||''}`;
+    const g = qr.result; const el = document.getElementById('auditGate');
+    if (el) el.innerHTML = '<b>'+g.overall_score+'分 ('+g.verdict+')</b> · 第'+g.rewrite_round+'轮 · 严重:'+(g.continuity_critical||0);
+  }
+  if (dr?.score !== undefined) {
+    const el = document.getElementById('auditDiv');
+    if (el) el.innerHTML = '<b>'+dr.score+'/100</b> · '+dr.chapters.length+'章分析' + (dr.issues?.length ? '<br>'+dr.issues.slice(0,3).join('<br>') : '');
+  }
+  // Load continuity
+  const cr = await api('/api/continuity');
+  if (cr) {
+    const el = document.getElementById('auditCont');
+    if (el) el.innerHTML = '发现: '+ (cr.issues?.length||cr.findings?.length||0) +'个问题';
+  }
+  // DeAI
+  const dr2 = await api('/api/deai');
+  if (dr2?.overall_score !== undefined) {
+    const el = document.getElementById('auditDeAI');
+    if (el) el.innerHTML = 'DeAI评分: <b>'+dr2.overall_score+'</b>/100';
   }
 }
 
 // ── Memory ──
 async function loadMemory() {
-  const r = await api('/api/status'); if (!r) return;
-  let html = '<h3>记忆面板</h3>';
-  html += `<p>日志路径: ${r.modules?.log_path||'~'}</p>`;
-  html += '<div class="card"><h4>最近日志</h4><div id="memLogs">加载中…</div></div>';
-  html += '<div class="card" style="margin-top:8px"><h4>快照</h4><div id="memSnaps">加载中…</div></div>';
-  document.getElementById('mainContent').innerHTML = html;
-  const lr = await api('/api/logs?lines=20');
-  if (lr?.available) {
-    document.getElementById('memLogs').innerHTML = lr.lines.map(l=>`<div style="font-size:11px;font-family:monospace">${l}</div>`).join('');
+  document.getElementById('mainContent').innerHTML = panels['memory'];
+  const [lr, sr] = await Promise.all([api('/api/logs?lines=15'), api('/api/snapshots')]);
+  const el1 = document.getElementById('memLogs');
+  if (el1 && lr?.available) {
+    el1.innerHTML = lr.lines.map(l=>'<div style="font-size:11px;font-family:monospace;padding:1px 0">'+l.substring(11,80)+'</div>').join('');
   }
-  const sr = await api('/api/snapshots');
-  if (sr?.snapshots?.length) {
-    document.getElementById('memSnaps').innerHTML = sr.snapshots.map(s=>`<div>${s.id.slice(0,15)}… ${s.label||''} (${s.chapter_count}章)</div>`).join('');
-  } else { document.getElementById('memSnaps').textContent = '暂无快照'; }
+  const el2 = document.getElementById('memSnaps');
+  if (el2 && sr?.snapshots?.length) {
+    el2.innerHTML = sr.snapshots.slice(0,10).map(s=>'<div style="padding:2px 0;border-bottom:1px solid var(--surface2)">'+s.id.substring(0,15)+' '+ (s.label||'') +' ('+s.chapter_count+'章 '+s.total_words+'字)</div>').join('');
+  }
 }
 
 // ── Logs ──
