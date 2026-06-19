@@ -315,6 +315,19 @@ textarea { resize: vertical; }
     <span id="tbStatus" style="margin-left:auto;font-size:11px;color:var(--text3)"></span>
   </div>
 
+  <!-- ── AI改写栏 ── -->
+  <div id="rewriteBar" style="display:flex;align-items:center;gap:8px;padding:6px 16px;background:var(--surface);border-bottom:1px solid var(--border);border-left:1px solid var(--border);border-right:1px solid var(--border);font-size:12px;flex-shrink:0;flex-wrap:wrap">
+    <span style="font-weight:700;color:var(--accent);white-space:nowrap;font-size:13px">AI改写</span>
+    <input type="text" id="rewritePrompt" placeholder="输入改写要求，如：换个更冷峻的语气..." style="flex:1;min-width:200px;max-width:500px;padding:5px 10px;font-size:12px">
+    <button class="btn-primary btn-sm" onclick="doRewriteExec()">改写选中</button>
+    <button class="btn-secondary btn-xs" onclick="cancelRewrite()" id="btnRewriteCancel" style="display:none">取消</button>
+    <span id="rewriteStatus" style="font-size:11px;color:var(--text3);margin-left:4px;white-space:nowrap"></span>
+    <span style="flex:1"></span>
+    <button class="btn-secondary btn-xs" onclick="var b=el('rewriteBar');b.style.display=b.style.display==='none'?'flex':'none'" title="折叠">−</button>
+  </div>
+  <!-- 改写输出区 -->
+  <div id="rewriteOutput" style="display:none;padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);border-left:1px solid var(--border);border-right:1px solid var(--border);font-size:13px;line-height:1.8;max-height:200px;overflow-y:auto;flex-shrink:0;white-space:pre-wrap;font-family:var(--serif)"></div>
+
   <!-- Editor -->
   <div class="editor-wrap" id="editorWrap">
     <div class="editor-inner">
@@ -632,23 +645,7 @@ textarea { resize: vertical; }
         </div>
       </div>
     </div>
-    <!-- Module 8: AI改写 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> AI改写
-      </div>
-      <div class="inspire-body">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">选中编辑器文字后输入要求点改写</div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap">
-          <input type="text" id="rewritePrompt" placeholder="改写要求：换个更冷峻的语气..." style="flex:1;min-width:140px;padding:4px 8px;font-size:12px">
-          <button class="btn-primary btn-sm" onclick="doRewriteExec()">改写选中</button>
-          <button class="btn-secondary btn-xs" onclick="cancelRewrite()" id="btnRewriteCancel" style="display:none">取消</button>
-        </div>
-        <div class="output-box" id="rewriteOutput" style="margin-top:6px;max-height:250px;overflow-y:auto;font-size:12px;line-height:1.8;display:none"></div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px" id="rewriteStatus"></div>
-      </div>
-    </div>
-    <!-- Module 9: 章节诊断 -->
+    <!-- Module 8: 章节诊断 -->
     <div class="inspire-module">
       <div class="inspire-header" onclick="toggleInspireModule(this)">
         <span class="arrow">&#9660;</span> 章节诊断
@@ -1148,10 +1145,9 @@ function doPause() {
 }
 
 // ── doRewrite ──
-// ── doRewrite (toolbar) → 聚焦AI改写模块 ──
+// ── doRewrite (toolbar) → 聚焦AI改写栏 ──
 function doRewrite() {
-  var out = el('rewriteOutput');
-  if (out) { var body = out.parentElement; if (body.classList.contains('collapsed')) body.classList.remove('collapsed'); }
+  var bar = el('rewriteBar'); if (bar && bar.style.display === 'none') bar.style.display = 'flex';
   var inp = el('rewritePrompt'); if (inp) { inp.focus(); inp.select(); }
   var ta = el('editorTextarea');
   if (ta) {
