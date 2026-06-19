@@ -1,9 +1,16 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Novel-Claude · 写作工作室</title>
+<script>
+// 防闪烁：在 CSS 加载前设置 data-theme
+(function(){
+  var t = localStorage.getItem('theme');
+  document.documentElement.setAttribute('data-theme', t || 'dark');
+})();
+</script>
 <style>
 :root {
   --bg: #1e1e24;
@@ -31,8 +38,29 @@
   --panel-right: 280px;
   --transition: 0.15s;
 }
+
+/* ── 亮色主题（日间书房） ── */
+[data-theme="light"] {
+  --bg: #ede4d3;
+  --surface: #fffdf9;
+  --surface2: #f5efe1;
+  --border: #d4c8b0;
+  --text: #2c2416;
+  --text2: #6b5d4a;
+  --text3: #9b8b72;
+  --accent: #c4681a;
+  --accent-hover: #d4782f;
+  --accent-light: #fef5e8;
+  --success: #4a7d3a;
+  --success-light: #edf5e4;
+  --danger: #b83a2c;
+  --danger-light: #fce8e4;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow: 0 4px 20px rgba(0,0,0,0.10);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--font); background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; letter-spacing: 0.01em; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; letter-spacing: 0.01em; transition: background-color 0.3s ease, color 0.3s ease; }
 button { cursor: pointer; font-family: inherit; border: none; border-radius: var(--radius-sm); padding: 6px 14px; font-size: 13px; font-weight: 400; transition: var(--transition); }
 button:hover { filter: brightness(1.05); }
 button:active { transform: scale(0.98); }
@@ -46,7 +74,7 @@ textarea { resize: vertical; }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-.btn-secondary:hover { background: #e8dfce; }
+.btn-secondary:hover { background: var(--border); }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-sm { padding: 3px 10px; font-size: 12px; }
 .btn-xs { padding: 2px 8px; font-size: 11px; }
@@ -280,6 +308,7 @@ textarea { resize: vertical; }
     <button class="btn-secondary btn-sm" onclick="doSaveSnapshot()">保存快照</button>
     <span class="sep"></span>
     <button class="btn-secondary btn-xs" onclick="toggleFocus()" title="专注模式">专注</button>
+    <button class="btn-secondary btn-xs" onclick="toggleTheme()" id="btnTheme" title="切换亮色/暗色模式" style="font-size:14px;padding:2px 6px">☀️</button>
     <span id="tbStatus" style="margin-left:auto;font-size:11px;color:var(--text3)"></span>
   </div>
 
@@ -1114,6 +1143,22 @@ function togglePanel(panelId) {
 function toggleFocus() {
   document.querySelector('.layout').classList.toggle('focus-mode');
 }
+
+// ── 主题切换 ──
+function toggleTheme() {
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  var btn = el('btnTheme');
+  if (btn) { btn.textContent = next === 'dark' ? '☀️' : '🌙'; btn.title = next === 'dark' ? '切换亮色模式' : '切换暗色模式'; }
+}
+// 页面加载时同步按钮状态
+(function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  var btn = document.getElementById('btnTheme');
+  if (btn) { btn.textContent = cur === 'dark' ? '☀️' : '🌙'; btn.title = cur === 'dark' ? '切换亮色模式' : '切换暗色模式'; }
+})();
 
 // ── toggleInspireModule ──
 function toggleInspireModule(headerEl) {
