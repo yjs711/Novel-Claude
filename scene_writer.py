@@ -329,6 +329,21 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
     # Build prompt using shared function
     prompt = build_chapter_prompt(volume_id, chapter_id, chapter_title, overview, entities)
 
+    # ── Style Reference Injection (Human-Reference Anchoring, POLARIS 2026) ──
+    # Must be at TOP of prompt — style target must be seen before instructions
+    try:
+        from core.style_reference import build_style_prompt
+        from utils.config_loader import get_config
+        genre_name = get_config("genre", default="")
+        if not genre_name:
+            from core.genre_knowledge import match_genre
+            genre_name = "修仙"
+        style_prompt = build_style_prompt(genre_name)
+        if style_prompt:
+            prompt = style_prompt + "\n" + prompt
+    except Exception:
+        pass  # Non-critical
+
     # Inject rewrite guidance if provided
     if rewrite_guidance:
         prompt += f"\n\n[Quality Gate Rewrite — Previous attempt issues to fix]\n{rewrite_guidance}\n"
