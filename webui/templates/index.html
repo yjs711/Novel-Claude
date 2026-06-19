@@ -630,6 +630,18 @@ textarea { resize: vertical; }
         </div>
       </div>
     </div>
+    <!-- Module 8: 章节诊断 -->
+    <div class="inspire-module">
+      <div class="inspire-header" onclick="toggleInspireModule(this)">
+        <span class="arrow">&#9660;</span> 章节诊断
+      </div>
+      <div class="inspire-body">
+        <div class="btn-row">
+          <button class="btn-primary btn-sm btn-block" onclick="runChapterAnalysis()">分析当前章节</button>
+        </div>
+        <div class="output-box" id="analysisOutput" style="margin-top:6px;max-height:400px;overflow-y:auto;font-size:12px;line-height:1.6"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2062,6 +2074,109 @@ function runComplianceCheck() {
   out.innerHTML = lexHtml + '<hr>' + out.innerHTML;
   // 最后跑AI检测（异步，追加到合并结果后）
   runAIComplianceCheck();
+}
+
+// ── 章节诊断 ──
+function runChapterAnalysis() {
+  var ta = el('editorTextarea');
+  var out = el('analysisOutput');
+  if (!out) return;
+  var text = ta ? ta.value : '';
+  if (!text || text.length < 100) { showToast('编辑器内容过短，至少100字', true); return; }
+
+  var vol = parseInt(el('selVolume').value) || 1;
+  var ch = parseInt(el('selChapter').value) || 1;
+  var genre = el('selGenre') ? el('selGenre').value : '';
+
+  out.innerHTML = '<div style="text-align:center;padding:20px"><span style="color:var(--accent)">&#128269; 正在分析第' + ch + '章...</span><br><small style="color:var(--text3)">约需 10-30 秒</small></div>';
+  showToast('正在分析章节结构...');
+
+  apiPost('/api/chapter-analysis', {content: text, chapter: ch, genre: genre}).then(function(r) {
+    if (!r || r.error) { out.innerHTML = '<span style="color:var(--danger)">分析失败: ' + (r ? r.error : '未知错误') + '</span>'; return; }
+    renderAnalysisResult(r);
+  });
+}
+
+function renderAnalysisResult(r) {
+  var out = el('analysisOutput');
+  if (!out) return;
+  var a = r.analysis || {};
+  var g = r.gate || {};
+  var score = a.overall_score || 0;
+  var scoreColor = score >= 75 ? 'var(--success)' : (score >= 50 ? 'var(--accent)' : 'var(--danger)');
+
+  var html = '';
+
+  // 总分
+  html += '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:8px">';
+  html += '<div style="font-size:28px;font-weight:700;color:' + scoreColor + '">' + score + '</div>';
+  html += '<div style="font-size:11px;color:var(--text2)">综合评分<br>耗时 ' + (r.elapsed_s || 0) + 's</div>';
+  if (g.passed !== undefined) html += '<div style="margin-left:auto"><span class="badge ' + (g.passed ? 'bg-ok' : 'bg-err') + '">' + (g.passed ? '通过' : '需改进') + '</span></div>';
+  html += '</div>';
+
+  // 摘要
+  if (a.summary) html += '<div><b>摘要</b>: ' + escHtml(a.summary) + '</div>';
+
+  // 伏笔
+  var fp = a.foreshadows_planted || [];
+  var fpa = a.foreshadows_paid || [];
+  if (fp.length > 0 || fpa.length > 0) {
+    html += '<div style="margin-top:6px"><b>伏笔</b></div>';
+    for (var i = 0; i < fp.length; i++) {
+      html += '<div style="font-size:11px;color:var(--accent)">+ 新埋: ' + escHtml(fp[i].desc) + ' [' + escHtml(fp[i].type) + '] → 预计第' + (fp[i].target_ch || '?') + '章回收</div>';
+    }
+    for (var i = 0; i < fpa.length; i++) {
+      html += '<div style="font-size:11px;color:var(--success)">&#10003; 回收: ' + escHtml(fpa[i].desc) + ' [' + escHtml(fpa[i].type) + ']</div>';
+    }
+  }
+
+  // 场景分析
+  var scenes = a.scenes || [];
+  if (scenes.length > 0) {
+    html += '<div style="margin-top:6px"><b>场景分解</b></div>';
+    html += '<table style="width:100%;font-size:11px;border-collapse:collapse">';
+    html += '<tr style="color:var(--text2)"><th style="text-align:left">场景</th><th>因果</th><th>冲突</th><th>爽点</th></tr>';
+    for (var i = 0; i < scenes.length; i++) {
+      var sc = scenes[i];
+      var cauColor = sc.causality === 'Therefore' || sc.causality === 'But' ? 'var(--success)' : (sc.causality === 'Coincidence' ? 'var(--danger)' : 'var(--text2)');
+      html += '<tr><td>' + escHtml(sc.name) + '</td><td style="color:' + cauColor + '">' + escHtml(sc.causality || '') + '</td><td>' + (sc.conflict || 0) + '</td><td>' + escHtml(sc.beat || '') + '</td></tr>';
+    }
+    html += '</table>';
+  }
+
+  // 节奏
+  html += '<div style="margin-top:6px"><b>节奏</b>: ' + escHtml(a.pacing_curve || '--') + ' · 张力高峰: ' + escHtml(a.tension_peak || '--') + '</div>';
+
+  // 指标
+  html += '<div style="display:flex;gap:12px;margin-top:4px;font-size:11px">';
+  html += '<span>对话占比: <b>' + (a.dialogue_pct || 0) + '%</b></span>';
+  html += '<span>爽点密度: <b>' + (a.satisfaction_density || 0) + '/10</b></span>';
+  if (g.avg_conflict) html += '<span>均冲突: <b>' + g.avg_conflict + '</b></span>';
+  html += '</div>';
+
+  // 因果链
+  if (a.causality_chain) html += '<div style="margin-top:4px"><b>因果链</b>: ' + escHtml(a.causality_chain) + '</div>';
+
+  // 门控警告
+  if (g.warnings && g.warnings.length > 0) {
+    html += '<div style="margin-top:6px;padding:4px 8px;background:#f5edd6;border-radius:var(--radius-sm);font-size:11px">';
+    for (var i = 0; i < g.warnings.length; i++) html += '&#9888; ' + escHtml(g.warnings[i]) + '<br>';
+    html += '</div>';
+  }
+  if (g.issues && g.issues.length > 0) {
+    html += '<div style="margin-top:4px;padding:4px 8px;background:var(--danger-light);border-radius:var(--radius-sm);font-size:11px">';
+    for (var i = 0; i < g.issues.length; i++) html += '&#10060; ' + escHtml(g.issues[i]) + '<br>';
+    html += '</div>';
+  }
+
+  // 改进建议
+  var suggs = a.suggestions || [];
+  if (suggs.length > 0) {
+    html += '<div style="margin-top:6px"><b>改进建议</b></div>';
+    for (var i = 0; i < suggs.length; i++) html += '<div style="font-size:11px">' + (i+1) + '. ' + escHtml(suggs[i]) + '</div>';
+  }
+
+  out.innerHTML = html;
 }
 </script>
 </body>

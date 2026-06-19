@@ -1750,6 +1750,84 @@ async def save_deai_rewrite(request: Request):
 
 # ── init / plan ─────────────────────────────────────────────────────────
 
+# ── 章节诊断 — 后置分析引擎 ────────────────────────────────────────────
+
+@app.post("/api/chapter-analysis")
+async def chapter_analysis(request: Request):
+    """Run structural audit on a chapter using local 27B model.
+    Returns foreshadowing, causality, conflict, pacing analysis."""
+    data = await request.json()
+    chapter_text = data.get("content", "")
+    chapter_num = data.get("chapter", 0)
+    genre = data.get("genre", load_cfg().get("genre", ""))
+
+    if not chapter_text or len(chapter_text) < 100:
+        return {"error": "章节内容过短，至少需要100字"}
+
+    try:
+        from core.chapter_analyzer import (
+            build_analysis_prompt, parse_analysis, gate_evaluation,
+            ANALYSIS_SYSTEM_PROMPT,
+        )
+        from utils.llm_client import get_task_client, get_task_model, _llm_temperature
+
+        # 使用推理模型（分析任务）
+        client = get_task_client("reasoning")
+        model = get_task_model("reasoning")
+        prompt = build_analysis_prompt(chapter_text, genre=genre, chapter_num=chapter_num)
+
+        start = time.time()
+        response = client.chat.completions.create(
+            model=model,
+            temperature=0.3,  # 低温确保分析一致性
+            max_tokens=2048,
+            messages=[
+                {"role": "system", "content": ANALYSIS_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            extra_body={"chat_template_kwargs": {"enable_thinking": True}},
+        )
+        elapsed = round(time.time() - start, 1)
+        raw = response.choices[0].message.content
+
+        analysis = parse_analysis(raw, chapter_id=f"ch{chapter_num}")
+        gate = gate_evaluation(analysis)
+
+        return {
+            "ok": True,
+            "elapsed_s": elapsed,
+            "chapter": chapter_num,
+            "analysis": {
+                "summary": analysis.summary,
+                "foreshadows_planted": [
+                    {"desc": f.description, "type": f.type, "target_ch": f.target_chapter}
+                    for f in analysis.foreshadows_planted
+                ],
+                "foreshadows_paid": [
+                    {"desc": f.description, "type": f.type}
+                    for f in analysis.foreshadows_paid
+                ],
+                "scenes": [
+                    {"name": s.name, "causality": s.causality,
+                     "conflict": s.conflict_level, "beat": s.satisfaction_beat,
+                     "chars": s.char_count}
+                    for s in analysis.scenes
+                ],
+                "causality_chain": analysis.causality_chain,
+                "pacing_curve": analysis.pacing_curve,
+                "tension_peak": analysis.tension_peak_chapter_position,
+                "dialogue_pct": analysis.dialogue_ratio_pct,
+                "satisfaction_density": analysis.satisfaction_density,
+                "overall_score": analysis.overall_score,
+                "suggestions": analysis.suggestions,
+            },
+            "gate": gate,
+        }
+    except Exception as e:
+        webui_logger.error(f"chapter_analysis error: {e}")
+        return {"error": str(e)}
+
+
 # ── 灵感工坊 — 对话式头脑风暴 ─────────────────────────────────────────
 
 @app.post("/api/workshop/chat")
