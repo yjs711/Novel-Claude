@@ -14,7 +14,13 @@ class EditorAgent:
         default_prompt = """你是一位极其严苛的白金网文主编。
         你的任务是审查作者提交的多个场景拼接成的初稿，并对其进行整体润色修改。
         你需要消除场景之间的割裂感，平滑自然段过渡，并修复视角跳跃。
-        如果需要，直接重写不合理的部分。你必须思考 (thought) 然后采取行动 (action)。"""
+        如果需要，直接重写不合理的部分。你必须思考 (thought) 然后采取行动 (action)。
+
+        特别注意AI写作的过度解释问题（StoryScope 2026: 77% AI小说直接解释主题 vs 52%人类）：
+        - 避免角色突然顿悟讲道理（"他彻底明白了一个道理"）
+        - 避免叙述者跳出来总结人生哲理（"人生就是这样..."）
+        - 避免章末像寓言一样总结教训
+        - 好的小说让读者自己体会含义，不是直接说出来"""
 
         self.system_prompt = os.getenv("PROMPT_S03_EDITOR", default_prompt)
         self.last_review_result = None  # stores structured review after run()
@@ -47,10 +53,11 @@ class EditorAgent:
                         "pacing_score": {"type": "integer", "description": "节奏控制 0-100"},
                         "dialogue_score": {"type": "integer", "description": "对话质量 0-100"},
                         "prose_score": {"type": "integer", "description": "文笔质量 0-100"},
+                        "over_explain_score": {"type": "integer", "description": "反过度解释 0-100 (StoryScope:77%AI vs 52%人类直接解释主题，越低代表越像AI)"},
                         "issues": {"type": "array", "items": {"type": "string"}, "description": "发现的主要问题列表"},
                         "strengths": {"type": "array", "items": {"type": "string"}, "description": "本章优点"}
                     },
-                    "required": ["overall_score", "consistency_score", "pacing_score", "dialogue_score", "prose_score", "issues"]
+                    "required": ["overall_score", "consistency_score", "pacing_score", "dialogue_score", "prose_score", "over_explain_score", "issues"]
                 }
             }
         }]
@@ -97,6 +104,8 @@ class EditorAgent:
                                 {"name": "节奏", "score": args.get("pacing_score", 75), "issues": []},
                                 {"name": "对话", "score": args.get("dialogue_score", 75), "issues": []},
                                 {"name": "文笔", "score": args.get("prose_score", 75), "issues": []},
+                                {"name": "反过度解释", "score": args.get("over_explain_score", 75),
+                                 "issues": ["直接解释主题/角色顿悟讲道理/章末总结教训"] if args.get("over_explain_score", 75) < 60 else []},
                             ],
                         }
                         print(f"  [score] Editor评分: {self.last_review_result['score']}/100, {len(self.last_review_result['issues'])}个问题")
