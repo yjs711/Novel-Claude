@@ -23,12 +23,19 @@ from core.continuity_engine import Finding
 logger = get_logger(__name__)
 
 
-# ── Gate thresholds ───────────────────────────────────────────────────────────
+# ── Gate thresholds (overridable via config.json quality_gate section) ────────
 
-PASS_THRESHOLD = 70      # >=70: chapter approved
-REWRITE_MIN = 40         # 40-69: rewrite with guidance
-BLOCK_THRESHOLD = 40     # <40: hard block
-MAX_REWRITE_ROUNDS = 3   # max rewrite attempts per chapter
+def _gate_config() -> dict:
+    try:
+        from utils.config_loader import get_config
+        return get_config("quality_gate", default={})
+    except Exception:
+        return {}
+
+PASS_THRESHOLD = _gate_config().get("pass_threshold", 70)
+REWRITE_MIN = _gate_config().get("rewrite_min", 40)
+BLOCK_THRESHOLD = _gate_config().get("rewrite_min", 40)  # same as rewrite boundary
+MAX_REWRITE_ROUNDS = _gate_config().get("max_rewrite_rounds", 3)
 
 
 @dataclass

@@ -216,6 +216,7 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
 
     prev_chapter = load_previous_chapter(volume_id, chapter_id)
     history_chapters = load_history_chapters(volume_id, chapter_id, count=3)
+    next_outline = load_next_chapter_outline(volume_id, chapter_id)
 
     # ── Build prompt: one chapter = one clear goal ──
     # Principle: emotional goal > plot outline > constraints

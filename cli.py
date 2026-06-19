@@ -555,13 +555,10 @@ def export(format, volume, author, cover, output):
         return
     print(f"Pandoc: {status.get('version', 'found')}")
 
-    cfg = load_cfg() if 'load_cfg' in dir() else {}
-    title = cfg.get("workspace", {}).get("novel_name", "Novel")
-    if 'load_cfg' not in dir():
-        try:
-            from utils.config_loader import get_config
-            title = get_config("workspace.novel_name", default="Novel")
-        except Exception:
+    try:
+        from utils.config_loader import get_config
+        title = get_config("workspace.novel_name", default="Novel")
+    except Exception:
             pass
 
     if volume:
@@ -585,8 +582,11 @@ def analyze(volume, as_json):
     from core.manuscript_analyzer import analyze_manuscript
     from utils.config import MANUSCRIPTS_DIR
 
-    cfg = load_cfg() if 'load_cfg' in dir() else {}
-    title = cfg.get("workspace", {}).get("novel_name", "Manuscript")
+    try:
+        from utils.config_loader import get_config
+        title = get_config("workspace.novel_name", default="Manuscript")
+    except Exception:
+        title = "Manuscript"
 
     report = analyze_manuscript(MANUSCRIPTS_DIR, title, volume)
     if not report:

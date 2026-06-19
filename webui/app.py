@@ -416,7 +416,8 @@ async def write_stream(request: Request):
 
                 from skills.wf_mo_shen_workflow.skill import WfMoShenWorkflowSkill
                 from core.novel_context import NovelContext
-                ctx = NovelContext()
+                from utils.workspace import WorkspaceManager
+                ctx = NovelContext(WorkspaceManager())
                 wf = WfMoShenWorkflowSkill(ctx)
                 wf._config = cfg
                 wf.current_mode = wf_mode
