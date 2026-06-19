@@ -1,6 +1,7 @@
 import json
 import os
 from utils.llm_client import _get_client
+from utils.logger import get_logger
 
 class EditorAgent:
     """
@@ -23,7 +24,13 @@ class EditorAgent:
 
 你必须在思考后先后调用 submit_quality_review（评分）和 submit_final_revision（润色后的正文）。"""
 
-        self.system_prompt = os.getenv("PROMPT_S03_EDITOR", default_prompt)
+        # Env override with validation — only used if explicitly set and non-empty
+        env_override = os.getenv("PROMPT_S03_EDITOR", "").strip()
+        if env_override and len(env_override) > 50:  # must be a real prompt
+            self.system_prompt = env_override
+            get_logger(__name__).info("EditorAgent: using PROMPT_S03_EDITOR override")
+        else:
+            self.system_prompt = default_prompt
         self.last_review_result = None  # stores structured review after run()
 
     def get_tools(self):

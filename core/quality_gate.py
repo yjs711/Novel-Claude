@@ -301,7 +301,7 @@ def build_rewrite_context(gate_result: GateResult) -> str:
     if gate_result.verdict == "PASS":
         return ""
 
-    parts = ["\n[Quality Gate Rewrite Guidance — Please address these issues]\n"]
+    parts = ["\n[Rewrite Guidance — Previous attempt issues to fix]\n"]
     for d in gate_result.dimensions:
         if d.weight > 0 and d.score < 70:
             parts.append(f"\n{d.name} (Score: {d.score}/100):")
