@@ -193,7 +193,11 @@ class Storyform:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
 
 
-# ── Quick templates ──────────────────────────────────────────────────────────
+# ── Quick templates (working examples, not official Dramatica) ──────────────
+# [待验证] These are our adaptations of NCP v1.3.0 schema principles applied to
+# common web novel genres. Not sourced from official Dramatica storyforms.
+# Verified: NCP schema structure (Throughline + StoryDynamics fields).
+# Unverified: Specific problem/solution/concern assignments per genre.
 
 STORYFORM_TEMPLATES = {
     "revenge": Storyform(

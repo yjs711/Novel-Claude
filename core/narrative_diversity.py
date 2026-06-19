@@ -31,7 +31,9 @@ class NarrativeShape:
     structural_markers: List[str]  # what to look for in output
 
 
-# Diverse persona set (Wan & Kalman 2026 pattern)
+# Diverse persona set — derived from Wan & Kalman 2026 (10 AI personas prevent homogenization).
+# Specific archetype definitions are our adaptation; not from a published taxonomy.
+# [待验证] Archetype names and markers are working hypotheses, not research-validated categories.
 NARRATIVE_ARCHETYPES: List[NarrativeShape] = [
     NarrativeShape(
         name="action-driven",
