@@ -31,6 +31,7 @@ class GenreKnowledge:
     core_appeal: str = ""           # 核心卖点
     target_reader: str = ""         # 目标读者
     word_count_range: str = ""      # 典型字数
+    plot_cycle: str = ""            # 剧情循环公式 (白蘸糖 2025: 题材+金手指+身份=循环)
 
     # Structure: 8-node template
     structure_nodes: List[Dict[str, str]] = field(default_factory=list)
@@ -60,6 +61,8 @@ class GenreKnowledge:
             f"\n[Genre Knowledge: {self.name}]",
             f"Core appeal: {self.core_appeal}",
         ]
+        if self.plot_cycle:
+            parts.append(f"Plot cycle: {self.plot_cycle}")
 
         if self.structure_nodes:
             parts.append("Story structure:")
@@ -119,6 +122,7 @@ _register(GenreKnowledge(
     core_appeal="从凡人到巅峰的力量成长+境界突破的爽感+资源争夺的紧张",
     target_reader="18-35岁男性，追求力量幻想和成长快感",
     word_count_range="200万-500万字",
+    plot_cycle="外门杂役(身份)+面板外挂/肝技能(金手指)+斩妖除魔(长线)+市井奇遇(日常)+日行一善(收获)→每次行善触发机缘→获得资源→突破境界→更强敌人出现→循环。换地图=数据大掉，只在万不得已时换。",
     structure_nodes=[
         {"position": "1.开篇钩子", "ratio": "5%", "content": "展示主角困境+特殊身份/金手指初现", "emotion": "好奇"},
         {"position": "2.初入修行", "ratio": "10%", "content": "获得功法/拜师/首次突破，展示力量体系规则", "emotion": "期待"},
@@ -165,6 +169,7 @@ _register(GenreKnowledge(
     core_appeal="宏大世界观下的力量探索+种族/势力碰撞+史诗感冒险",
     target_reader="18-35岁男性，喜欢世界观构建和力量体系创新",
     word_count_range="200万-600万字",
+    plot_cycle="底层出身(农奴/铁匠学徒)+血脉觉醒/传承(金手指)+学院修炼(学习)→佣兵团/冒险(展示实力)→发现更大世界秘密→换地图(用莲花写作法以一点为中心扩散)→更高层次冲突→循环。核心:资源匮乏+等级森严+丛林法则，不断获取资源突破天花板。",
     structure_nodes=[
         {"position": "1.世界观初现", "ratio": "5%", "content": "展示独特世界观规则+主角特殊之处", "emotion": "新奇"},
         {"position": "2.力量觉醒", "ratio": "10%", "content": "主角发现/获得独特力量体系入门", "emotion": "期待"},
@@ -206,6 +211,7 @@ _register(GenreKnowledge(
     core_appeal="现实世界的逆袭幻想+身份反差爽感+人情世故的精准拿捏",
     target_reader="18-40岁男女，追求现实代入感和身份反转快感",
     word_count_range="100万-300万字",
+    plot_cycle="落魄身份(退役兵王/实习医生/外卖员)+系统/重生记忆(金手指)+财富积累(第一循环)→地位提升(第二循环)→情感线推进(核心循环,都市文上限靠情感线)→触碰更高势力→身份反转→新目标。核心:都市文忌讳纯事业线,情感线最容易成功。",
     structure_nodes=[
         {"position": "1.身份揭露", "ratio": "5%", "content": "主角特殊身份/能力初现，与现实处境形成反差", "emotion": "好奇"},
         {"position": "2.第一次打脸", "ratio": "10%", "content": "用能力解决第一个现实问题，震惊周围人", "emotion": "爽"},
