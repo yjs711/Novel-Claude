@@ -241,7 +241,9 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
         next_overview = next_outline.get("overview", "")
         prompt_parts.append(f"【下一章预告】:\n{next_title}：{next_overview}\n")
 
-    # Structured outline (scene-level beats — most important structural guidance)
+    # Structured outline (scene-level beats — AI: detail in = detail out)
+    # Unlike human authors (who may lose inspiration from over-planning),
+    # AI models produce BETTER output with MORE detailed outlines.
     structured_outline = _load_structured_outline_chapter(chapter_id)
     if structured_outline:
         detail_parts = []
@@ -255,12 +257,15 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
             detail_parts.append(f"章末钩子: {structured_outline['ending_hook']}")
         if structured_outline.get("scenes_text") or structured_outline.get("scenes"):
             scenes = structured_outline.get("scenes_text") or "\n".join(
-                f"- {s.get('name','')}: {s.get('goal','')} | 冲突: {s.get('conflict','')}"
+                f"- {s.get('name','')}: 目标={s.get('goal','')} | 冲突={s.get('conflict','')} | POV={s.get('pov','主角')}"
                 for s in (structured_outline.get("scenes", []) if isinstance(structured_outline.get("scenes"), list) else [])
             )
-            detail_parts.append(f"场景:\n{scenes}")
+            detail_parts.append(f"场景分解:\n{scenes}")
         if detail_parts:
-            prompt_parts.append("【细纲 — 本章执行指南】\n" + "\n".join(detail_parts) + "\n")
+            prompt_parts.append("【细纲 — 本章执行指南（AI模型：越详细输出越精准）】\n" + "\n".join(detail_parts) + "\n")
+    else:
+        # No structured outline — inject minimal goal from overview
+        logger.info("No structured_outline for chapter %d, using overview as fallback", chapter_id)
 
     fs_ctx = _load_foreshadowing_context(chapter_id)
     if fs_ctx:
