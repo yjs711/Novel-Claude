@@ -15,7 +15,12 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-app = FastAPI(title="Novel-Claude Fusion")
+app = FastAPI(title="Novel-Claude Fusion v3")
+
+# ── Logging: configure ONCE ──
+from utils.logger import setup_logging, get_logger, log_step
+setup_logging()
+webui_logger = get_logger("webui")
 
 # Mount static
 static_dir = Path(__file__).parent / "static"
@@ -198,8 +203,9 @@ async def status():
     novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
     sp = Path(f".novel_{novel_dir}" if novel_dir else ".novel") / "story_state.json"
 
-    result = {"connected": True, "provider": get_provider_info()["provider"],
-              "model": get_provider_info()["model"], "novel_name": novel_dir}
+    pi = get_provider_info()
+    result = {"connected": True, "provider": pi["provider"],
+              "model": pi["model"], "novel_name": novel_dir}
 
     if sp.exists():
         s = load_story_state(sp)
@@ -213,6 +219,42 @@ async def status():
             {"num": num, "title": ch.title, "status": ch.status, "words": ch.word_count}
             for num, ch in sorted(s.chapters.items())[-20:]
         ]
+
+    # ── New modules status ──
+    cfg = load_cfg()
+    result["modules"] = {
+        "quality_gate": cfg.get("quality_gate", {}).get("enabled", True),
+        "quality_gate_threshold": cfg.get("quality_gate", {}).get("pass_threshold", 70),
+        "logging": True,
+        "log_path": str(Path(os.path.expanduser("~/.novel_claude_logs"))),
+        "daily_rotation": True,
+    }
+
+    # Last quality gate result
+    try:
+        from core.quality_gate import get_last_result
+        lr = get_last_result()
+        if lr:
+            result["last_gate"] = {"score": lr.overall_score, "verdict": lr.verdict,
+                                    "round": lr.rewrite_round, "critical": lr.continuity_critical}
+    except Exception:
+        pass
+
+    # Narrative diversity
+    try:
+        from core.narrative_diversity import diversity_score
+        # Load recent chapter fingerprints if available
+        result["diversity"] = {"status": "available", "archetypes": 5}
+    except Exception:
+        pass
+
+    # Storyform status
+    try:
+        sf_path = sp.parent / "storyform.json" if sp.exists() else Path(".novel/storyform.json")
+        result["storyform"] = {"loaded": sf_path.exists()}
+    except Exception:
+        result["storyform"] = {"loaded": False}
+
     return result
 
 @app.get("/api/continuity")
@@ -1687,6 +1729,126 @@ async def plan_novel(request: Request):
     result = subprocess.run(args, capture_output=True, text=True,
                             cwd=str(Path(__file__).parent.parent), timeout=300)
     return {"ok": True, "output": result.stdout + result.stderr}
+
+
+# ── new module endpoints ─────────────────────────────────────────────────────
+
+@app.get("/api/quality-gate")
+async def quality_gate_status():
+    """Get last quality gate evaluation result."""
+    from core.quality_gate import get_last_result
+    result = get_last_result()
+    if not result:
+        return {"available": False}
+    return {"available": True, "result": result.to_dict(),
+            "formatted": result.format_report(0)}
+
+
+@app.get("/api/storyform")
+async def get_storyform():
+    """Get current NCP storyform."""
+    from core.storyform import Storyform, STORYFORM_TEMPLATES
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    base = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    sf_path = base / "storyform.json"
+    if sf_path.exists():
+        sf = Storyform.from_dict(json.loads(sf_path.read_text(encoding="utf-8")))
+        return {"available": True, "storyform": sf.to_dict(),
+                "context": sf.to_writing_context()}
+    return {"available": False, "templates": list(STORYFORM_TEMPLATES.keys())}
+
+
+@app.post("/api/storyform")
+async def save_storyform(request: Request):
+    """Save or create a storyform. Body: {template: 'revenge'} or full storyform dict."""
+    from core.storyform import Storyform, STORYFORM_TEMPLATES
+    data = await request.json()
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    base = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    base.mkdir(parents=True, exist_ok=True)
+    sf_path = base / "storyform.json"
+
+    # Use template
+    if "template" in data and data["template"] in STORYFORM_TEMPLATES:
+        sf = STORYFORM_TEMPLATES[data["template"]]
+    elif "objective_story" in data:
+        sf = Storyform.from_dict(data)
+    else:
+        return {"error": "Provide 'template' name or full storyform data"}
+
+    sf.title = data.get("title", sf.title)
+    sf_path.write_text(sf.to_json(), encoding="utf-8")
+    log_step("Storyform saved", template=data.get("template", "custom"), title=sf.title)
+    return {"ok": True, "storyform": sf.to_dict()}
+
+
+@app.get("/api/logs")
+async def get_logs(lines: int = 50, level: str = None):
+    """Get recent log entries from the daily log file."""
+    from utils.logger import get_log_path, LOG_DIR
+    log_path = get_log_path()
+    if not log_path.exists():
+        # Try listing available log files
+        files = sorted(LOG_DIR.glob("novel_claude*"), key=lambda p: p.stat().st_mtime, reverse=True)
+        return {"available": False, "files": [f.name for f in files[:5]]}
+
+    with open(log_path, "r", encoding="utf-8") as f:
+        all_lines = f.readlines()
+
+    if level:
+        level_upper = level.upper()
+        all_lines = [l for l in all_lines if f"| {level_upper} " in l]
+
+    recent = all_lines[-lines:]
+    total = len(all_lines)
+    size = log_path.stat().st_size
+
+    return {"available": True, "path": str(log_path), "total_lines": total,
+            "size_kb": round(size / 1024, 1), "lines": [l.rstrip() for l in recent]}
+
+
+@app.get("/api/diversity")
+async def get_diversity():
+    """Get narrative diversity assessment for recent chapters."""
+    from core.narrative_diversity import (NARRATIVE_ARCHETYPES, fingerprint_chapter,
+                                           diversity_score, suggest_archetype)
+    from utils.config import MANUSCRIPTS_DIR
+
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    result = {"archetypes": [a.name for a in NARRATIVE_ARCHETYPES], "chapters": []}
+
+    # Find recent chapter files
+    manuscript = Path(MANUSCRIPTS_DIR)
+    chapters = sorted(manuscript.rglob("ch_*_final.md"))[-10:]
+    fps = []
+    for ch_path in chapters:
+        try:
+            ch_num = int(ch_path.stem.split("_")[1])
+            text = ch_path.read_text(encoding="utf-8")
+            fp = fingerprint_chapter(text, ch_num)
+            fps.append(fp)
+            result["chapters"].append({
+                "num": ch_num,
+                "protagonist_resolves": fp.protagonist_resolves,
+                "explicit_theme": fp.explicit_theme,
+                "philosophical_dialogue": fp.philosophical_dialogue,
+                "single_pov": fp.single_pov,
+                "linear_time": fp.linear_time,
+                "subplot_advance": fp.subplot_advance,
+            })
+        except Exception:
+            pass
+
+    if len(fps) >= 2:
+        score, issues = diversity_score(fps)
+        result["score"] = score
+        result["issues"] = issues
+        result["suggestion"] = suggest_archetype(fps)
+    else:
+        result["score"] = 100
+        result["issues"] = ["需要更多章节才能评估多样性"]
+
+    return result
 
 
 def _load_prompt_refs(*fnames: str) -> str:
