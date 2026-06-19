@@ -73,6 +73,11 @@
   .toast { position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;z-index:999;animation:slideUp .3s }
   @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
   .toast-ok { background:var(--success-light);color:var(--success) }
+
+.focus-mode .sidebar { display:none !important }
+.focus-mode .right-panel { display:none !important }
+.focus-mode .panel-write { padding:60px 120px !important }
+.focus-mode .panel-write .inner { max-width:800px !important }
 </style>
 </head>
 <body>
@@ -360,7 +365,7 @@ async function loadSettings() {
   if (ss) { ss.innerHTML = (r.styles||['网文爽文']).map(s=>`<option>${s}</option>`).join(''); }
 }
 
-// ── Event Delegation ──
+// Event delegation
 document.addEventListener('click', async e => {
   const t = e.target;
   if (t.id === 'cfgSave') {
@@ -371,10 +376,6 @@ document.addEventListener('click', async e => {
   if (t.id === 'cfgSFApply') {
     const v = document.getElementById('cfgSF')?.value; if(!v) return;
     await api('/api/storyform', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({template:v})}); toast('已应用');
-  }
-  if (t.id === 'outlineSave') {
-    const v = document.getElementById('outlineText')?.value;
-    if (v) { await api('/api/outline', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content:v})}); toast('大纲已保存'); }
   }
   if (t.id === 'outlineLoad') {
     const r = await api('/api/outline'); if (r?.outline) document.getElementById('outlineText').value = r.outline;
@@ -391,9 +392,9 @@ async function doModelSwitch() { const r = await api('/api/models'); if(r) { con
 
 // ── Panels ──
 const panels = {
-  write: '<div class="panel panel-write"><div class="inner"><div class="output" id="writeOutput">点击「生成」开始创作…</div><div class="status-bar"><span>字数: <b id="writeWords">0</b></span><span>门控: <b id="writeGate">--</b></span></div></div></div>',
+  write: '<div class="panel panel-write"><div class="inner"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px"><h3 style="margin:0">写作</h3><div style="display:flex;gap:10px;align-items:center;font-size:12px;color:var(--text2)"><span>速度: <b id="writeSpeed">0</b>字/分</span><span>用时: <b id="writeTime">00:00</b></span><span>字数: <b id="writeWords">0</b></span><span>保存: <b id="writeSave" style="color:var(--success)">就绪</b></span><select id="writeFontSize" style="width:55px;font-size:11px" onchange="document.getElementById('writeEditor').style.fontSize=this.value+'px'"><option value="16">16px</option><option value="18" selected>18px</option><option value="20">20px</option></select><button class="btn-secondary btn-sm" onclick="toggleFocus()">专注</button></div></div><textarea id="writeEditor" placeholder="在此写作，或点击上方「生成」让AI帮你写。每30秒自动保存。" style="width:100%;min-height:420px;font-family:var(--font-serif);font-size:18px;line-height:2;padding:28px 36px;border:1px solid var(--border);border-radius:var(--radius);resize:vertical;background:var(--surface);outline:none" oninput="onWriteInput()"></textarea><div class="status-bar" style="margin-top:8px"><span>门控: <b id="writeGate">--</b></span></div></div></div>',
   dashboard: '<div class="panel"><div class="panel-grid"><div class="card"><h4>总字数</h4><div class="val" id="dashWords">—</div></div><div class="card"><h4>已完成</h4><div class="val" id="dashChapters">—</div></div><div class="card"><h4>角色数</h4><div class="val" id="dashChars">—</div></div><div class="card"><h4>剧情线</h4><div class="val" id="dashThreads">—</div></div><div class="card wide"><h4>质量门控</h4><div id="dashGate">自动加载…</div></div><div class="card wide"><h4>叙事多样性</h4><div id="dashDiversity">自动加载…</div></div></div></div>',
-  outline: '<div class="panel"><h3>大纲管理</h3><div class="card"><textarea id="outlineText" style="width:100%;min-height:380px;font-size:13px;font-family:var(--font-mono);border:none;resize:vertical" placeholder="点击下方「加载大纲」按钮…"></textarea></div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn-primary btn-sm" id="outlineSave">保存大纲</button><button class="btn-secondary btn-sm" id="outlineLoad">加载大纲</button></div></div>',
+  outline: '<div class="panel"><h3>大纲管理 · 输入停止5秒自动保存</h3><div class="card"><textarea id="outlineText" style="width:100%;min-height:380px;font-size:13px;font-family:var(--font-mono);border:none;resize:vertical" placeholder="直接编辑，停止输入5秒后自动保存…" oninput="clearTimeout(window._os);window._os=setTimeout(()=>{const v=document.getElementById(\'outlineText\')?.value;if(v!==undefined)api(\'/api/outline\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({content:v})})},5000)"></textarea></div><div style="margin-top:12px"><button class="btn-secondary btn-sm" id="outlineLoad">从服务器加载</button></div></div>',
   characters: '<div class="panel"><h3>角色管理</h3><div class="card" style="min-height:200px"><div id="charContent">切换到「角色」自动加载…</div></div></div>',
   world: '<div class="panel"><h3>世界观管理</h3><div class="card" style="min-height:200px"><div id="worldContent">切换到「世界」自动加载…</div></div></div>',
   audit: '<div class="panel"><div class="panel-grid"><div class="card"><h4>连续性检查</h4><div id="auditCont">自动加载…</div></div><div class="card"><h4>去AI检测</h4><div id="auditDeAI">自动加载…</div></div><div class="card"><h4>质量门控</h4><div id="auditGate">—</div></div><div class="card"><h4>叙事多样性</h4><div id="auditDiv">—</div></div></div></div>',
@@ -403,6 +404,29 @@ const panels = {
 };
 
 // ── Init ──
+// ── Autosave ──
+let _wt = null; let _wstart = Date.now();
+function onWriteInput() {
+  clearTimeout(_wt);
+  const el = document.getElementById('writeEditor'); if(!el) return;
+  const chars = (el.value.match(/[\u4e00-\u9fff]/g)||[]).length;
+  document.getElementById('writeWords').textContent = chars;
+  const em = Math.max(1, Math.floor((Date.now()-_wstart)/60000));
+  document.getElementById('writeSpeed').textContent = Math.floor(chars/em);
+  const s = Math.floor((Date.now()-_wstart)/1000)%60;
+  document.getElementById('writeTime').textContent = String(Math.floor((Date.now()-_wstart)/60000)).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  _wt = setTimeout(() => {
+    localStorage.setItem('novel_claude_draft', el.value);
+    document.getElementById('writeSave').textContent = '已保存';
+    document.getElementById('writeSave').style.color = 'var(--success)';
+  }, 30000);
+}
+function toggleFocus() {
+  document.querySelector('.layout').classList.toggle('focus-mode');
+  document.querySelector('.toolbar').classList.toggle('tab-hidden');
+}
+const draft = localStorage.getItem('novel_claude_draft');
+if (draft) { setTimeout(() => { const el = document.getElementById('writeEditor'); if(el) { el.value = draft; onWriteInput(); } }, 800); }
 showTab('write');
 </script>
 </body>
