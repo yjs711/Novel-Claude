@@ -134,6 +134,22 @@ def _deai_to_dimensions(deai_report: Optional[dict]) -> List[DimensionScore]:
     return dims if dims else [DimensionScore(name="去AI味(DeAI)", score=100, weight=0.25)]
 
 
+def _diversity_to_dimension(fingerprints: list = None) -> DimensionScore:
+    """Narrative diversity check (StoryScope 2026 anti-homogenization)."""
+    if not fingerprints:
+        return DimensionScore(name="叙事多样性(Diversity)", score=100, weight=0.10)
+
+    from core.narrative_diversity import diversity_score
+    score, issues = diversity_score(fingerprints)
+    return DimensionScore(
+        name="叙事多样性(Diversity)",
+        score=score,
+        weight=0.10,
+        issues=issues,
+        markers=[f"{len(fingerprints)} chapters analyzed"],
+    )
+
+
 def _editor_to_dimensions(editor_result: Optional[dict]) -> List[DimensionScore]:
     """Convert Editor Agent result to scored dimensions."""
     if editor_result is None:
@@ -166,6 +182,7 @@ def evaluate(
     deai_report: Optional[dict] = None,
     editor_result: Optional[dict] = None,
     rewrite_round: int = 1,
+    diversity_fingerprints: list = None,
 ) -> GateResult:
     """
     Evaluate chapter quality across all dimensions.
@@ -176,6 +193,7 @@ def evaluate(
     all_dims.extend(_continuity_to_dimensions(continuity_findings))
     all_dims.extend(_deai_to_dimensions(deai_report))
     all_dims.extend(_editor_to_dimensions(editor_result))
+    all_dims.append(_diversity_to_dimension(diversity_fingerprints))
 
     # Floor principle: overall is limited by the weakest weighted dimension
     weighted_dims = [d for d in all_dims if d.weight > 0]

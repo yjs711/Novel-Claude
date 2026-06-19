@@ -330,6 +330,27 @@ def generate_chapter_content(volume_id: int, chapter_id: int, state_manager=None
     if rewrite_guidance:
         prompt += f"\n\n[Quality Gate Rewrite — Previous attempt issues to fix]\n{rewrite_guidance}\n"
 
+    # Inject narrative diversity context (anti-homogenization, StoryScope 2026)
+    try:
+        from core.narrative_diversity import fingerprint_chapter, build_diversity_context
+        from utils.config import MANUSCRIPTS_DIR
+        # Load recent chapters for fingerprinting
+        recent_fps = []
+        for prev_ch in range(max(1, chapter_id - 5), chapter_id):
+            ch_path = Path(MANUSCRIPTS_DIR) / f"vol_{volume_id:02d}" / f"ch_{prev_ch:03d}_final.md"
+            if ch_path.exists():
+                try:
+                    ch_text = ch_path.read_text(encoding="utf-8")
+                    recent_fps.append(fingerprint_chapter(ch_text, prev_ch))
+                except Exception:
+                    pass
+        if recent_fps:
+            diversity_ctx = build_diversity_context(recent_fps)
+            if diversity_ctx:
+                prompt += diversity_ctx
+    except Exception:
+        pass  # Non-critical, don't block generation
+
     # Emit hook for skill injection
     beat_data = {"chapter_id": chapter_id, "title": chapter_title, "overview": overview}
     prompt_parts = [prompt]
