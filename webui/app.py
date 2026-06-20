@@ -571,6 +571,21 @@ async def write_stream(request: Request):
                                                    emotion=auto_emotion)
             system_prompt += _build_causal_context(chapter)
 
+            # 注入素材笔记 (乌贼模式: 真实细节)
+            from core.material_research import MaterialResearcher
+            researcher = MaterialResearcher(Path(f".novel_{novel_dir}" if novel_dir else ".novel"))
+            system_prompt = researcher.inject_to_prompt(system_prompt)
+
+            # 检索可回收伏笔 (乌贼模式: 随身扔)
+            from core.material_research import LooseForeshadowScanner
+            reusable = LooseForeshadowScanner.find_reusable_hooks(
+                Path(f".novel_{novel_dir}" if novel_dir else ".novel"), chapter, prompt or "")
+            if reusable:
+                hooks_text = "\n\n**可回收的伏笔线索（以下是之前随手的钩子, 可根据剧情选择使用）:**\n"
+                for h in reusable:
+                    hooks_text += f"- ch{h['chapter']}: {h['text'][:60]} ({h['type']})\n"
+                system_prompt += hooks_text
+
             # 注入角色状态 (写前)
             system_prompt += _build_character_context(novel_dir or "", chapter)
 
@@ -662,6 +677,9 @@ async def write_stream(request: Request):
                         from core.character_state import CharacterStateManager
                         cmgr = CharacterStateManager(novel_path)
                         cmgr.update_from_chapter(chapter, full_content)
+                        # 伏笔随手扔 (乌贼模式)
+                        from core.material_research import LooseForeshadowScanner
+                        LooseForeshadowScanner.save_hooks(novel_path, chapter, full_content)
                         return audit
                     except Exception:
                         return None

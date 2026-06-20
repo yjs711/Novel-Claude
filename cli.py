@@ -1004,3 +1004,20 @@ def graph_context(chapter):
         print(f"\n【活跃线索】({len(threads)}条)")
         for t in threads[:10]:
             print(f"  [{t['id']}] {t['summary'][:80]}")
+
+
+@graph.command("materials")
+@click.option("--genre", "-g", type=str, help="体裁(默认读取config)")
+@click.option("--style", "-s", type=str, help="风格(默认读取config)")
+def graph_materials(genre, style):
+    """乌贼模式: 生成世界素材笔记(先素材, 后大纲)"""
+    from utils.config import NOVEL_DIR
+    from core.material_research import MaterialResearcher
+    cfg = load_cfg()
+    g = genre or cfg.get("genre", "修仙")
+    s = style or cfg.get("style", "网文爽文")
+    print(f"\n🔍 乌贼模式: 为 {g}×{s} 生成世界素材...")
+    researcher = MaterialResearcher(NOVEL_DIR)
+    notes = researcher.research_materials(g, s)
+    print(notes[:2000])
+    print(f"\n✅ 素材笔记已保存到 {NOVEL_DIR / 'materials' / '素材笔记.md'}")
