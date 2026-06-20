@@ -389,32 +389,106 @@ class CausalGraphEngine:
         sentences = [s.strip() for s in re.split(r'[。！？\n]', content) if len(s.strip()) > 5]
         count = 0
         for sent in sentences:
-            # 跳过太短的句子和纯描述
             if len(sent) < 8 or sent.startswith("#") or sent.startswith("*"):
                 continue
-
-            # 简单命名实体检测：在【】或""中的内容优先
             participants = []
             bracketed = re.findall(r'【(.+?)】|"([^"]+)"', sent)
             if not bracketed:
-                # 取前两个名词作为参与者
                 words = re.findall(r'[一-鿿]{2,4}', sent)
                 participants = words[:2] if len(words) >= 2 else ["未知"]
-
             event_type = "action" if any(w in sent for w in ["杀", "打", "攻击", "修炼", "突破"]) else "dialogue" if "说" in sent or "道" in sent else "transition"
             stac = self.classify_stac(sent, event_type)
-
             evt = EventNode(
-                id="",
-                chapter=chapter_num,
-                event_type=event_type,
-                stac_type=stac,
-                summary=sent[:80],
-                participants=participants,
+                id="", chapter=chapter_num, event_type=event_type,
+                stac_type=stac, summary=sent[:80], participants=participants,
                 emotional_valence=0.0,
             )
             self.add_event(evt)
             count += 1
-
         self.save()
         return count
+
+    def extract_events_llm(self, chapter_num: int, content: str, model: str | None = None) -> int:
+        """
+        使用 LLM 精确提取事件 + 因果链接（P1）
+
+        基于 STAC 框架: Situation→Task→Action→Consequence
+        返回提取到的事件数
+        """
+        from utils.llm_client import get_task_client, get_task_model, _llm_temperature
+
+        client = get_task_client("planning")
+        if model is None:
+            model = get_task_model("planning")
+
+        # 截取内容（避免超长）
+        text = content[:6000]
+
+        system = """你是小说结构分析师。从章节中提取关键事件，输出 JSON。
+
+事件类型 (STAC):
+- situation: 设定/环境建立
+- task: 决定/计划/目标
+- action: 具体行动/战斗/对话推进
+- consequence: 结果/影响/变化
+
+输出格式（只输出 JSON 数组，不要解释）:
+[{"summary":"事件描述(20字内)","stac":"action","participants":["角色名"],"causes":["前置事件描述"],"emotional":0.5}]"""
+
+        user = f"""分析以下小说章节，提取 8-15 个关键事件。每个事件包含: summary(20字内描述)、stac(situation/task/action/consequence)、participants(参与角色列表)、causes(前置事件描述——如果此事件是另一事件的直接结果) 、emotional(-1到1的情感值)。
+
+章节正文:
+{text}
+
+请只输出 JSON 数组。"""
+
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                temperature=0.3,
+                max_tokens=2048,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+            )
+            raw = response.choices[0].message.content
+            # 提取 JSON 数组
+            match = re.search(r'\[[\s\S]*\]', raw)
+            if not match:
+                print(f"  [⚠️] LLM 返回非 JSON 格式: {raw[:200]}")
+                return 0
+
+            events_data = json.loads(match.group())
+            count = 0
+            for ed in events_data:
+                evt = EventNode(
+                    id="",
+                    chapter=chapter_num,
+                    event_type="action",
+                    stac_type=ed.get("stac", "action"),
+                    summary=ed.get("summary", "")[:80],
+                    participants=ed.get("participants", []),
+                    emotional_valence=ed.get("emotional", 0.0),
+                )
+                eid = self.add_event(evt)
+
+                # 处理因果链
+                for cause_desc in ed.get("causes", []):
+                    # 在已有事件中查找匹配的前置事件
+                    for existing in list(self.events.values()):
+                        if (existing.chapter == chapter_num
+                                and cause_desc[:10] in existing.summary
+                                and existing.id != eid):
+                            self._link(existing.id, eid, confidence=0.7)
+                            break
+
+                count += 1
+
+            self.save()
+            return count
+
+        except Exception as e:
+            print(f"  [⚠️] LLM 提取失败: {e}")
+            return 0

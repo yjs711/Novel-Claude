@@ -895,7 +895,8 @@ def graph_threads():
 @graph.command("import")
 @click.option("--chapter", "-c", type=int, required=True, help="章节号")
 @click.option("--file", "-f", type=str, help="章节文件路径（不指定则查 manuscripts）")
-def graph_import(chapter, file):
+@click.option("--llm/--no-llm", default=False, help="使用 LLM 精确提取（默认规则提取）")
+def graph_import(chapter, file, llm):
     """从章节文件中批量导入事件"""
     from pathlib import Path
     from utils.config import NOVEL_DIR
@@ -904,7 +905,6 @@ def graph_import(chapter, file):
     if file:
         fp = Path(file)
     else:
-        # 查找章节文件
         ms = NOVEL_DIR / "manuscripts"
         for vd in sorted(ms.glob("vol_*")):
             fp = vd / f"ch_{chapter:03d}_final.md"
@@ -920,7 +920,14 @@ def graph_import(chapter, file):
 
     content = fp.read_text(encoding="utf-8")
     engine = CausalGraphEngine(NOVEL_DIR)
-    count = engine.import_from_chapter(chapter, content)
-    print(f"\n✅ 从第{chapter}章导入 {count} 个事件")
+
+    if llm:
+        print(f"\n🤖 使用 LLM 精确提取第{chapter}章事件...")
+        count = engine.extract_events_llm(chapter, content)
+        print(f"\n✅ LLM 提取 {count} 个事件")
+    else:
+        count = engine.import_from_chapter(chapter, content)
+        print(f"\n✅ 从第{chapter}章导入 {count} 个事件")
+
     print(f"   文件: {fp}")
     engine.save()
