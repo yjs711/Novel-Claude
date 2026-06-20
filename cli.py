@@ -797,3 +797,130 @@ def inspire(genre, count):
     for step in CHAPTER_CYCLE["steps"]:
         print(f"  {step['name']}({step['length']}): {step['content_hint']}")
     print(f"  对话要求: 第3步和第4步必须有对话")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 因果图引擎 CLI
+# ═══════════════════════════════════════════════════════════════════
+
+@cli.group()
+def graph():
+    """因果图引擎 — 事件追踪、因果链、角色行为、伏笔管理"""
+    pass
+
+
+@graph.command("summary")
+def graph_summary():
+    """查看因果图概览（事件数、活跃线索、伏笔状态）"""
+    from utils.config import NOVEL_DIR
+    from core.causal_graph import CausalGraphEngine
+    engine = CausalGraphEngine(NOVEL_DIR)
+    s = engine.get_summary()
+    print(f"\n因果图状态:")
+    print(f"  事件总数: {s['total_events']}")
+    print(f"  覆盖章节: {s['chapters_covered']}")
+    print(f"  活跃线索: {s['active_threads']} (未闭合因果链)")
+    print(f"  角色: {s['characters']} (有目标: {s['characters_with_goals']})")
+    print(f"  伏笔: 已埋 {s['foreshadows_planted']} | 已回收 {s['foreshadows_paid']}")
+
+
+@graph.command("events")
+@click.option("--chapter", "-c", type=int, help="指定章节号")
+@click.option("--limit", "-n", type=int, default=20, help="最多显示条数")
+def graph_events(chapter, limit):
+    """列出事件。可选 --chapter/-c 按章节过滤"""
+    from utils.config import NOVEL_DIR
+    from core.causal_graph import CausalGraphEngine
+    engine = CausalGraphEngine(NOVEL_DIR)
+
+    if chapter:
+        events = engine.get_chapter_events(chapter)
+        print(f"\n第{chapter}章 事件 ({len(events)}个):")
+    else:
+        events = list(engine.events.values())
+        events.sort(key=lambda e: (e.chapter, e.id))
+        events = events[:limit]
+        print(f"\n最近 {len(events)} 个事件:")
+
+    for e in events:
+        stac_tag = {"situation": "📋", "task": "🎯", "action": "⚔️", "consequence": "💥"}.get(e.stac_type, "❓")
+        chars = ",".join(e.participants[:3])
+        print(f"  {stac_tag} [{e.id}] ch{e.chapter} {e.summary[:50]}")
+        if chars:
+            print(f"     👤 {chars}")
+
+
+@graph.command("chain")
+@click.argument("event_id")
+@click.option("--depth", "-d", default=3, help="追溯深度")
+def graph_chain(event_id, depth):
+    """查看某个事件的因果链（前因+后果）"""
+    from utils.config import NOVEL_DIR
+    from core.causal_graph import CausalGraphEngine
+    engine = CausalGraphEngine(NOVEL_DIR)
+    chain = engine.get_causal_chain(event_id, depth)
+
+    if "error" in chain:
+        print(f"\n❌ {chain['error']}")
+        return
+
+    evt = chain["event"]
+    print(f"\n🔍 事件: {evt['summary']}")
+    print(f"   类型: {evt['stac']} | 章节: ch{evt['chapter']} | 角色: {', '.join(evt['participants'])}")
+    print(f"\n📥 前因 (向上追溯 {depth} 层):")
+    for c in chain["causes"]:
+        print(f"   ← {c['id']}: {c['summary'][:60]}")
+    if not chain["causes"]:
+        print(f"   (无)")
+    print(f"\n📤 后果 (向下追溯 {depth} 层):")
+    for c in chain["effects"]:
+        print(f"   → {c['id']}: {c['summary'][:60]}")
+    if not chain["effects"]:
+        print(f"   (无)")
+
+
+@graph.command("threads")
+def graph_threads():
+    """查看所有活跃因果线（未闭合的事件链）"""
+    from utils.config import NOVEL_DIR
+    from core.causal_graph import CausalGraphEngine
+    engine = CausalGraphEngine(NOVEL_DIR)
+    threads = engine.get_active_threads()
+    print(f"\n活跃因果线 ({len(threads)}条):")
+    for t in threads:
+        print(f"  [{t['id']}] ch{t['chapter']} {t['stac']}")
+        print(f"    {t['summary'][:80]}")
+
+
+@graph.command("import")
+@click.option("--chapter", "-c", type=int, required=True, help="章节号")
+@click.option("--file", "-f", type=str, help="章节文件路径（不指定则查 manuscripts）")
+def graph_import(chapter, file):
+    """从章节文件中批量导入事件"""
+    from pathlib import Path
+    from utils.config import NOVEL_DIR
+    from core.causal_graph import CausalGraphEngine
+
+    if file:
+        fp = Path(file)
+    else:
+        # 查找章节文件
+        ms = NOVEL_DIR / "manuscripts"
+        for vd in sorted(ms.glob("vol_*")):
+            fp = vd / f"ch_{chapter:03d}_final.md"
+            if fp.exists():
+                break
+        else:
+            print(f"\n❌ 未找到第{chapter}章文件")
+            return
+
+    if not fp.exists():
+        print(f"\n❌ 文件不存在: {fp}")
+        return
+
+    content = fp.read_text(encoding="utf-8")
+    engine = CausalGraphEngine(NOVEL_DIR)
+    count = engine.import_from_chapter(chapter, content)
+    print(f"\n✅ 从第{chapter}章导入 {count} 个事件")
+    print(f"   文件: {fp}")
+    engine.save()
