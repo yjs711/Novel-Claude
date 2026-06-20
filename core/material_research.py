@@ -98,8 +98,10 @@ class MaterialResearcher:
         genre_dirs = {
             "修仙": "ancient", "仙侠": "ancient", "武侠": "ancient", "历史": "ancient",
             "玄幻": "ancient",
-            "科幻": "scifi", "赛博": "scifi", "星际": "scifi", "末世": "scifi",
+            "科幻": "scifi", "赛博": "scifi", "星际": "scifi",
+            "末世": "postapoc", "废土": "postapoc",
             "都市": "modern", "校园": "modern", "重生": "modern", "系统流": "modern",
+            "悬疑": "crime", "灵异": "crime", "盗墓": "crime",
         }
         subdir = genre_dirs.get(genre)
         if not subdir:
