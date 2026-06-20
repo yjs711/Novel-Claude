@@ -41,6 +41,18 @@ def save_cfg(cfg):
     with open(cfg_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
+def _build_audit_context(chapter: int) -> str:
+    """加载上一章的审计结果（大纲回写循环）"""
+    try:
+        novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+        novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+        from core.outline_manager import OutlineManager
+        mgr = OutlineManager(novel_path)
+        return "\n\n" + mgr.get_audit_summary(chapter)
+    except Exception:
+        return ""
+
+
 def _build_causal_context(chapter: int) -> str:
     """加载因果图引擎，生成写作前上下文（角色动机+活跃线索）。"""
     try:
@@ -547,6 +559,12 @@ async def write_stream(request: Request):
             system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""),
                                                    emotion=auto_emotion)
             system_prompt += _build_causal_context(chapter)
+
+            # 注入上一章审计 (大纲回写循环, P2)
+            if chapter > 1:
+                audit_ctx = _build_audit_context(chapter - 1)
+                if audit_ctx:
+                    system_prompt += audit_ctx
             # 用 Queue 在线程和事件循环之间传递 token
             token_queue: asyncio.Queue = asyncio.Queue()
 
@@ -612,6 +630,21 @@ async def write_stream(request: Request):
                     from scene_writer import post_process_chapter
                     return post_process_chapter(volume, chapter, full_content)
                 ch_file, gate_verdict, _ = await asyncio.to_thread(sync_post)
+
+                # 写后审计 (大纲回写循环, P2)
+                def sync_audit():
+                    try:
+                        novel_path = Path(f".novel_{cfg.get('workspace',{}).get('novel_name','')}" if cfg.get('workspace',{}).get('novel_name') else ".novel")
+                        from core.outline_manager import OutlineManager
+                        mgr = OutlineManager(novel_path)
+                        cfg_outline = load_cfg()
+                        outline_data = {"volumes": cfg_outline.get("volumes", [])} if "volumes" in cfg_outline else {"volumes": []}
+                        audit = mgr.audit_chapter(chapter, full_content, outline_data)
+                        return audit
+                    except Exception:
+                        return None
+                asyncio.ensure_future(asyncio.to_thread(sync_audit))
+
                 yield "data: " + _json.dumps({
                     "type": "done", "chapter": chapter, "words": len(full_content),
                     "path": str(ch_file), "gate_verdict": gate_verdict or "none",
