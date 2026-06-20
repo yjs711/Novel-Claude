@@ -523,9 +523,19 @@ async def write_stream(request: Request):
             top_p = _llm_top_p("writing")
 
             from utils.prompt_loader import writing_prompt, inject_style_reference
+            from core.emotion_analyzer import EmotionAnalyzer
+
             system_prompt = writing_prompt() + _build_genre_style_injection(cfg)
+
+            # 自动检测大纲情感基调（零手动操作）
+            auto_emotion = data.get("emotion", "")
+            if not auto_emotion and prompt:
+                auto_emotion = EmotionAnalyzer.detect_from_outline(prompt, chapter)
+            if auto_emotion:
+                system_prompt += EmotionAnalyzer.format_emotion_hint(auto_emotion)
+
             system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""),
-                                                   emotion=data.get("emotion", ""))
+                                                   emotion=auto_emotion)
             system_prompt += _build_causal_context(chapter)
             # 用 Queue 在线程和事件循环之间传递 token
             token_queue: asyncio.Queue = asyncio.Queue()
