@@ -25,7 +25,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-VERSION = "v0.5"
+VERSION = "v0.6"
 
 app = FastAPI(title=f"Novel-Claude Fusion {VERSION}")
 
@@ -620,18 +620,18 @@ async def write_stream(request: Request):
             token_queue: asyncio.Queue = asyncio.Queue()
 
             def sync_stream():
-                """在线程中运行同步流式调用"""
+                """在线程中运行同步流式调用（超长超时，用死开关检测真正僵死）"""
                 try:
                     stream = client.chat.completions.create(
                         model=model, temperature=temp,
                         frequency_penalty=freq_pen, presence_penalty=pres_pen,
-                        top_p=top_p, max_tokens=8192, stream=True,
+                        top_p=top_p, max_tokens=4096, stream=True,
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": prompt}
                         ],
                         extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-                        timeout=300,  # 5分钟超时
+                        timeout=600,  # HTTP 超时 10 分钟（本地模型预填充可能很慢）
                     )
                     for chunk in stream:
                         if chunk.choices and chunk.choices[0].delta.content:
@@ -644,35 +644,77 @@ async def write_stream(request: Request):
             loop = asyncio.get_event_loop()
             future = loop.run_in_executor(None, sync_stream)
 
-            # 从主事件循环消费 token
-            timeout_seconds = 360  # 6分钟总超时
-            deadline = asyncio.get_event_loop().time() + timeout_seconds
+            # ── Dead-man switch：跟踪距上次收到 token 的时间 ──
+            # 优势：不会因为模型预填充慢而误杀，只在真正僵死时断开
+            total_timeout = 600         # 10 分钟硬上限
+            stale_timeout = 45          # 45 秒没新 token → 判定僵死
+            heartbeat_interval = 15     # 15 秒发心跳（比之前 30s 更频繁，SSE 连接更稳）
+            deadline = asyncio.get_event_loop().time() + total_timeout
+            last_token_time = asyncio.get_event_loop().time()
             full_content = ""
+            token_count = 0
 
             try:
                 while True:
-                    remaining = deadline - asyncio.get_event_loop().time()
-                    if remaining <= 0:
-                        yield "data: " + _json.dumps({"type": "error", "msg": "生成超时（6分钟）"}, ensure_ascii=False) + "\n\n"
+                    now = asyncio.get_event_loop().time()
+                    # 总超时检查
+                    if now >= deadline:
+                        if full_content:
+                            yield "data: " + _json.dumps({
+                                "type": "partial", "msg": f"总超时({total_timeout}s)，已保存 {len(full_content)} 字内容",
+                                "words": len(full_content)
+                            }, ensure_ascii=False) + "\n\n"
+                        else:
+                            yield "data: " + _json.dumps({"type": "error", "msg": f"生成超时（{total_timeout}秒）"}, ensure_ascii=False) + "\n\n"
                         break
+                    # 僵死检测（dead-man switch）
+                    stale_duration = now - last_token_time
+                    if stale_duration > stale_timeout and token_count > 0:
+                        yield "data: " + _json.dumps({
+                            "type": "partial", "msg": f"流式僵死（{stale_timeout}s 无新token），已保存 {len(full_content)} 字",
+                            "words": len(full_content)
+                        }, ensure_ascii=False) + "\n\n"
+                        break
+                    # 队列等待（用心跳间隔而非僵死超时）
+                    wait_seconds = min(heartbeat_interval, deadline - now)
+                    if wait_seconds <= 0:
+                        wait_seconds = 1
                     try:
-                        kind, value = await asyncio.wait_for(token_queue.get(), timeout=min(remaining, 30))
+                        kind, value = await asyncio.wait_for(token_queue.get(), timeout=wait_seconds)
                     except asyncio.TimeoutError:
-                        # 30秒没新 token，检查是否完成，发心跳保活
+                        # 心跳保活 + 进度报告
                         if future.done():
                             break
+                        yield "data: " + _json.dumps({
+                            "type": "progress", "words": len(full_content),
+                            "elapsed": int(now - (deadline - total_timeout))
+                        }, ensure_ascii=False) + "\n\n"
                         yield ": heartbeat\n\n"
                         continue
                     if kind == "token":
                         full_content += value
+                        token_count += 1
+                        last_token_time = now
                         yield "data: " + _json.dumps({"type": "stream", "text": value}, ensure_ascii=False) + "\n\n"
                     elif kind == "done":
                         break
                     elif kind == "error":
-                        yield "data: " + _json.dumps({"type": "error", "msg": value}, ensure_ascii=False) + "\n\n"
+                        if full_content:
+                            yield "data: " + _json.dumps({
+                                "type": "partial", "msg": f"生成中断: {value[:100]}，已保存 {len(full_content)} 字",
+                                "words": len(full_content), "error": value[:200]
+                            }, ensure_ascii=False) + "\n\n"
+                        else:
+                            yield "data: " + _json.dumps({"type": "error", "msg": value}, ensure_ascii=False) + "\n\n"
                         return
             except Exception as e:
-                yield "data: " + _json.dumps({"type": "error", "msg": f"生成异常: {str(e)}"}, ensure_ascii=False) + "\n\n"
+                if full_content:
+                    yield "data: " + _json.dumps({
+                        "type": "partial", "msg": f"异常: {str(e)[:100]}，已保存 {len(full_content)} 字",
+                        "words": len(full_content)
+                    }, ensure_ascii=False) + "\n\n"
+                else:
+                    yield "data: " + _json.dumps({"type": "error", "msg": f"生成异常: {str(e)}"}, ensure_ascii=False) + "\n\n"
                 return
 
             # Post-processing
