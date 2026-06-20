@@ -931,3 +931,76 @@ def graph_import(chapter, file, llm):
 
     print(f"   文件: {fp}")
     engine.save()
+
+
+@graph.command("characters")
+@click.option("--add", "-a", type=str, help="添加角色: name:goal:personality(amb=0.8,loyal=0.3,...)")
+@click.option("--list", "-l", "list_flag", is_flag=True, help="列出所有角色")
+@click.option("--tick", "-t", type=int, help="推演指定章节的角色状态")
+def graph_characters(add, list_flag, tick):
+    """管理角色: 添加/列出/推演"""
+    from utils.config import NOVEL_DIR
+    from core.causal_graph import CausalGraphEngine, CharacterNode, Goal
+
+    engine = CausalGraphEngine(NOVEL_DIR)
+
+    if add:
+        parts = add.split(":")
+        name = parts[0]
+        goal_desc = parts[1] if len(parts) > 1 else ""
+        pers_str = parts[2] if len(parts) > 2 else ""
+        p = {"ambition":0.5, "loyalty":0.5, "aggression":0.5, "cunning":0.5, "empathy":0.5}
+        if pers_str:
+            for kv in pers_str.split(","):
+                k, v = kv.split("=")
+                k = k.strip()
+                if k in p and 0 <= float(v) <= 1:
+                    p[k] = float(v)
+        char = CharacterNode(id="", name=name, personality=p)
+        if goal_desc:
+            char.goals.append(Goal(id="g_001", description=goal_desc, priority=0.7))
+        engine.add_character(char)
+        engine.save()
+        print(f"✅ 添加: {name} 目标:{goal_desc or '(无)'} 性格:{p}")
+
+    if list_flag:
+        engine._ensure_characters_from_events()
+        chars = list(engine.characters.values())
+        print(f"\n角色列表 ({len(chars)}人):")
+        for c in chars:
+            goals = [g for g in c.goals if g.status == "active"]
+            print(f"  {c.name:8s} | ch{c.first_appearance}-{c.last_appearance} | {len(goals)}目标")
+            for g in goals:
+                print(f"    {g.description} (p:{g.priority:.1f})")
+            for rid, rel in sorted(c.relationships.items(), key=lambda x: abs(x[1].intensity), reverse=True):
+                o = engine.get_character(rid)
+                print(f"    {rel.rel_type} {o.name if o else rid} ({rel.intensity:+.1f})")
+
+    if tick:
+        events = engine.get_chapter_events(tick)
+        if events:
+            engine.tick_characters(tick, events)
+            print(f"✅ 第{tick}章角色推演完成 ({len(events)}个事件)")
+        else:
+            print(f"⚠️ 第{tick}章无事件，请先 import")
+
+
+@graph.command("context")
+@click.option("--chapter", "-c", type=int, required=True, help="章节号")
+def graph_context(chapter):
+    """生成写作前上下文（角色动机+活跃线索）"""
+    from utils.config import NOVEL_DIR
+    from core.causal_graph import CausalGraphEngine
+
+    engine = CausalGraphEngine(NOVEL_DIR)
+    ctx = engine.get_active_characters_context(chapter)
+    threads = engine.get_active_threads()
+
+    print(f"\n=== 第{chapter}章 写作上下文 ===")
+    if ctx:
+        print("\n【角色动机】")
+        print(ctx)
+    if threads:
+        print(f"\n【活跃线索】({len(threads)}条)")
+        for t in threads[:10]:
+            print(f"  [{t['id']}] {t['summary'][:80]}")

@@ -308,10 +308,15 @@ class CausalGraphEngine:
     def get_character(self, char_id: str) -> CharacterNode | None:
         return self.characters.get(char_id)
 
+    def find_character_by_name(self, name: str) -> CharacterNode | None:
+        for c in self.characters.values():
+            if c.name == name:
+                return c
+        return None
+
     def _update_character_appearances(self, event: EventNode):
         """记录角色出场信息"""
         for name in event.participants:
-            # 按名称匹配角色
             for char in self.characters.values():
                 if char.name == name:
                     if char.first_appearance == 0 or event.chapter < char.first_appearance:
@@ -320,38 +325,155 @@ class CausalGraphEngine:
                         char.last_appearance = event.chapter
                     break
 
-    # ── 反事实验证（P0 stub, P1 接入 LLM） ────────────────────────
+    def _ensure_characters_from_events(self):
+        """从已有事件中自动创建角色节点"""
+        for event in self.events.values():
+            for name in event.participants:
+                if name and name not in ["未知", ""] and not self.find_character_by_name(name):
+                    char = CharacterNode(id="", name=name)
+                    self.add_character(char)
+
+    # ── 反事实验证 ─────────────────────────────────────────
 
     def counterfactual_verify(self, cause_id: str, effect_id: str) -> bool:
-        """
-        反事实验证（Beyond LLMs 论文方法）：
-        "如果前提事件没发生，结果事件是否依然合理？"
-        P0: 规则推断（同章节+同角色 → 高度相关）
-        P1: 接入 LLM 判断
-        """
+        """P0 规则版，P1 接入 LLM"""
         cause = self.events.get(cause_id)
         effect = self.events.get(effect_id)
         if not cause or not effect:
             return False
-
-        # 规则1: 同章节 + 同角色 + 行动→结果 = 强因果
         if (cause.chapter == effect.chapter
                 and set(cause.participants) & set(effect.participants)
                 and cause.stac_type == "action"
                 and effect.stac_type == "consequence"):
             return True
-
-        # 规则2: 不同章节 + 无共同角色 = 弱相关
         if (effect.chapter - cause.chapter > 3
                 and not (set(cause.participants) & set(effect.participants))):
             return False
-
-        # 规则3: 有共同角色 + 情感方向一致 = 可能因果
         if (set(cause.participants) & set(effect.participants)
                 and cause.emotional_valence * effect.emotional_valence > 0):
             return True
-
         return False
+
+    # ═════════════════════════════════════════════════════════════
+    # P2: 角色行为引擎 (GOAP + Utility AI)
+    # ═════════════════════════════════════════════════════════════
+
+    def tick_characters(self, chapter: int, new_events: list[EventNode]):
+        """章节写完后调用: 推演所有角色状态"""
+        self._ensure_characters_from_events()
+        for char in self.characters.values():
+            for goal in char.goals:
+                goal.priority = self._calc_goal_priority(char, goal, chapter)
+            self._update_relationships(char, new_events)
+            self._check_new_goals(char, new_events)
+            for event in new_events:
+                if char.name in event.participants:
+                    if char.first_appearance == 0 or event.chapter < char.first_appearance:
+                        char.first_appearance = event.chapter
+                    char.last_appearance = event.chapter
+        self.save()
+
+    def _calc_goal_priority(self, char: CharacterNode, goal: Goal, current_chapter: int) -> float:
+        """Utility AI: priority = 性格匹配 × 紧迫度"""
+        p = char.personality
+        desc = goal.description
+        base = 0.5
+        if any(w in desc for w in ["复仇","杀死","击败","摧毁","消灭"]):
+            base = p["aggression"] * 1.0 + p["ambition"] * 0.5
+        elif any(w in desc for w in ["保护","守护","拯救","帮助"]):
+            base = p["empathy"] * 1.0 + p["loyalty"] * 0.5
+        elif any(w in desc for w in ["力量","修炼","突破","变强","获得"]):
+            base = p["ambition"] * 1.0 + p["cunning"] * 0.3
+        elif any(w in desc for w in ["隐藏","秘密","调查","收集情报"]):
+            base = p["cunning"] * 1.0
+        urgency = 1.0
+        if goal.deadline_chapter:
+            remaining = goal.deadline_chapter - current_chapter
+            if remaining <= 0: urgency = 1.5
+            elif remaining < 5: urgency = 1.0 + (5 - remaining) * 0.1
+            else: urgency = 0.5
+        return max(0.0, min(1.5, base * urgency))
+
+    def _update_relationships(self, char: CharacterNode, events: list[EventNode]):
+        """基于事件更新角色关系"""
+        for event in events:
+            participants = set(event.participants)
+            if char.name not in participants:
+                continue
+            for other_name in participants:
+                if other_name == char.name:
+                    continue
+                other = self.find_character_by_name(other_name)
+                if not other:
+                    continue
+                rel = char.relationships.get(other.id)
+                if not rel:
+                    rel = Relationship(target_id=other.id, rel_type="neutral")
+                    char.relationships[other.id] = rel
+                if event.emotional_valence > 0.5:
+                    rel.intensity = min(1.0, rel.intensity + 0.1)
+                    if rel.intensity > 0.5: rel.rel_type = "ally"
+                elif event.emotional_valence < -0.5:
+                    rel.intensity = max(-1.0, rel.intensity - 0.1)
+                    if rel.intensity < -0.3: rel.rel_type = "enemy"
+                elif event.event_type == "dialogue":
+                    if event.emotional_valence > 0.3:
+                        rel.intensity = min(1.0, rel.intensity + 0.05)
+                    elif event.emotional_valence < -0.3:
+                        rel.intensity = max(-1.0, rel.intensity - 0.05)
+                rel.history.append(event.id)
+                rel.last_updated = event.chapter
+
+    def _check_new_goals(self, char: CharacterNode, events: list[EventNode]):
+        """事件驱动的目标触发"""
+        for event in events:
+            text = event.summary
+            if char.name not in event.participants:
+                continue
+            if any(w in text for w in ["发现","得知","听说","听闻","暴露"]):
+                desc = f"调查: {text[:30]}"
+                if not any(g.description == desc for g in char.goals):
+                    char.goals.append(Goal(id=f"g_{len(char.goals)+1:03d}", description=desc, priority=0.6))
+            if any(w in text for w in ["袭击","追杀","攻击","埋伏"]):
+                desc = f"应对威胁: {text[:30]}"
+                if not any(g.description == desc for g in char.goals):
+                    char.goals.append(Goal(id=f"g_{len(char.goals)+1:03d}", description=desc, priority=0.8))
+
+    def get_character_context(self, char_id: str) -> str:
+        """生成角色上下文（注入写作 prompt）"""
+        char = self.characters.get(char_id)
+        if not char:
+            return ""
+        parts = [f"【{char.name}】"]
+        active_goals = sorted([g for g in char.goals if g.status == "active"], key=lambda g: g.priority, reverse=True)
+        if active_goals:
+            parts.append("当前目标:")
+            for g in active_goals[:3]:
+                parts.append(f"  - {g.description} (优先级:{g.priority:.1f})")
+        if char.relationships:
+            parts.append("关键关系:")
+            for rid, rel in sorted(char.relationships.items(), key=lambda x: abs(x[1].intensity), reverse=True)[:5]:
+                other = self.characters.get(rid)
+                name = other.name if other else rid
+                tag = {-1:"🔴", 0:"⚪", 0.3:"🟢", 0.5:"💚"}.get(rel.intensity, "⚪")
+                parts.append(f"  {tag} {name}: {rel.rel_type}({rel.intensity:+.1f})")
+        p = char.personality
+        traits = []
+        if p["ambition"] > 0.65: traits.append("有野心")
+        if p["loyalty"] > 0.65: traits.append("重情义")
+        if p["aggression"] > 0.65: traits.append("好斗")
+        if p["cunning"] > 0.65: traits.append("狡黠")
+        if p["empathy"] > 0.65: traits.append("有同理心")
+        if traits:
+            parts.append(f"性格: {', '.join(traits)}")
+        return "\n".join(parts)
+
+    def get_active_characters_context(self, chapter: int) -> str:
+        """获取当前章节活跃角色的上下文"""
+        recent = [c for c in self.characters.values() if c.last_appearance >= chapter - 3 and c.last_appearance > 0]
+        recent.sort(key=lambda c: c.last_appearance, reverse=True)
+        contexts = [self.get_character_context(c.id) for c in recent[:5] if c.goals or c.relationships]
+        return "\n\n".join(contexts) if contexts else ""
 
     # ── STAC 分类辅助 ───────────────────────────────────────────
 
