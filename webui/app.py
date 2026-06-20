@@ -1915,6 +1915,116 @@ async def causal_graph_events(chapter: int = 0):
         return {"available": False, "error": str(e)}
 
 
+# ── 素材研究 API (乌贼模式) ───────────────────────────────
+
+@app.post("/api/materials/generate")
+async def generate_materials(request: Request):
+    """生成世界素材笔记（乌贼模式：先素材，后大纲）"""
+    data = await request.json()
+    genre = data.get("genre", load_cfg().get("genre", "修仙"))
+    style = data.get("style", load_cfg().get("style", "网文爽文"))
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    from core.material_research import MaterialResearcher
+    researcher = MaterialResearcher(novel_path)
+    notes = researcher.research_materials(genre, style)
+    return {"ok": True, "notes": notes[:3000], "length": len(notes),
+            "path": str(novel_path / "materials" / "素材笔记.md")}
+
+@app.get("/api/materials/status")
+async def materials_status():
+    """检查素材笔记是否存在"""
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    fp = novel_path / "materials" / "素材笔记.md"
+    return {"available": fp.exists(), "size": fp.stat().st_size if fp.exists() else 0,
+            "path": str(fp)}
+
+
+# ── 角色状态 API ──────────────────────────────────────────
+
+@app.get("/api/characters/states")
+async def character_states():
+    """获取所有角色状态"""
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    from core.character_state import CharacterStateManager
+    mgr = CharacterStateManager(novel_path)
+    chars = []
+    for c in mgr.characters.values():
+        chars.append({
+            "name": c.name, "role": c.role, "location": c.location,
+            "cultivation": c.cultivation_level, "emotion": c.emotional_state,
+            "goal": c.current_goal, "appearances": c.total_appearances,
+            "last_chapter": c.last_appearance,
+            "relationships": c.relationships,
+        })
+    return {"available": True, "characters": chars, "summary": mgr.get_summary()}
+
+
+# ── 大纲分支 API ──────────────────────────────────────────
+
+@app.get("/api/outline/branches")
+async def outline_branches():
+    """列出大纲分支和版本"""
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(novel_path)
+    return {"branches": engine.list_branches(), "versions": engine.list_versions()[:10]}
+
+@app.post("/api/outline/branch")
+async def create_outline_branch(request: Request):
+    """创建大纲分支"""
+    data = await request.json()
+    name = data.get("name", "")
+    if not name: return {"error": "name required"}
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(novel_path)
+    path = engine.branch(name)
+    return {"ok": True, "name": name, "path": str(path)} if path else {"error": "no outline file"}
+
+@app.post("/api/outline/check-impact")
+async def check_outline_impact(request: Request):
+    """检测大纲修改的影响"""
+    data = await request.json()
+    chapter = data.get("chapter", 0)
+    changes = data.get("changes", {})
+    if not chapter or not changes: return {"error": "chapter and changes required"}
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(novel_path)
+    return engine.check_impact(chapter, changes)
+
+@app.get("/api/outline/review-needed")
+async def outline_review_needed():
+    """列出需复查的章节"""
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(novel_path)
+    return {"items": engine.list_review_needed()}
+
+
+# ── 章节摘要 API ──────────────────────────────────────────
+
+@app.get("/api/outline/summaries")
+async def chapter_summaries():
+    """获取章节摘要和全局统计"""
+    novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+    novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+    from core.context_manager import ChapterSummarizer
+    summarizer = ChapterSummarizer(novel_path)
+    return {
+        "recent": summarizer.get_recent_context(5),
+        "global": summarizer.get_global_summary(),
+        "total": len(summarizer.summaries),
+    }
+
+
 # ── 通用改写（去AI味 + 自定义要求） ────────────────────────────
 
 @app.post("/api/deai-rewrite")

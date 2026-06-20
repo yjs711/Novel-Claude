@@ -371,7 +371,13 @@ textarea { resize: vertical; }
         <span>速度: <b id="statSpeed">0</b> 字/分</span>
         <span>用时: <b id="statTime">00:00</b></span>
         <span>门控: <b id="statGate">--</b></span>
-        <span style="margin-left:auto" id="statSave">就绪</span>
+        <span>角色: <b id="statChars" title="活跃角色数">-</b></span>
+        <span>伏笔: <b id="statForeshadows" title="活跃伏笔数">-</b></span>
+        <span style="margin-left:auto">
+          <span id="statReview" style="color:var(--danger);display:none;cursor:pointer" title="需复查的章节" onclick="loadReviewNeeded()">⚠ 复查</span>
+          <span id="statMaterials" style="color:var(--accent);cursor:pointer" title="生成世界素材" onclick="generateMaterials()">📝素材</span>
+        </span>
+        <span id="statSave">就绪</span>
       </div>
     </div>
   </div>
@@ -1181,6 +1187,52 @@ function doPause() {
   finishGen();
   logMsg('已暂停');
   showToast('已暂停生成');
+}
+
+// ── 状态刷新 ──
+function refreshStatusIndicators() {
+  // 素材状态
+  fetch('/api/materials/status').then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('statMaterials');
+    if (el) el.title = d.available ? ('素材笔记: '+Math.round(d.size/1024)+'KB') : '点击生成世界素材';
+  });
+  // 角色数
+  fetch('/api/characters/states').then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('statChars');
+    if (el && d.available) el.textContent = d.summary.active + '/' + d.summary.total;
+  });
+  // 伏笔数
+  fetch('/api/causal-graph/summary').then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('statForeshadows');
+    if (el && d.available) el.textContent = d.foreshadows_planted || '0';
+  });
+  // 需复查
+  fetch('/api/outline/review-needed').then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('statReview');
+    if (el && d.items && d.items.length > 0) {
+      el.style.display = ''; el.textContent = '⚠ ' + d.items.length + '复查';
+    }
+  });
+}
+setTimeout(refreshStatusIndicators, 2000);
+
+function generateMaterials() {
+  var g = (el('selGenre')||{}).value || '修仙';
+  var s = (el('selStyle')||{}).value || '网文爽文';
+  showToast('正在生成世界素材...');
+  fetch('/api/materials/generate', {method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({genre:g, style:s})}).then(function(r){return r.json()}).then(function(d){
+    if (d.ok) showToast('素材笔记已生成: '+Math.round(d.length/1000)+'K字');
+    else showToast('素材生成失败', true);
+  });
+}
+
+function loadReviewNeeded() {
+  fetch('/api/outline/review-needed').then(function(r){return r.json()}).then(function(d){
+    if (!d.items || d.items.length===0) { showToast('无待复查章节'); return; }
+    var msg = '需复查章节:\\n' + d.items.map(function(i){return '第'+i.chapter+'章: '+i.reason}).join('\\n');
+    showToast(msg, false, 8000);
+  });
 }
 
 // ── 因果图可视化 ──
