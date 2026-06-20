@@ -113,7 +113,13 @@ def inject_style_reference(base_prompt: str, style: str, genre: str = "") -> str
 	"""
 	ref = match_style_reference(style, genre)
 	if ref:
-		return base_prompt + "\n\n---\n**风格参照（以下为人类写作范本，请学习其节奏和手法，但不要直接抄袭内容）：**\n\n" + ref
+		disclaimer = (
+			"---\n"
+			"**风格参照（学习节奏/句式/留白，但以下内容严禁模仿）：**\n"
+			"- 不要学比喻结构（像/仿佛/如同/犹如）。真人用比喻是说不清楚才用，AI用比喻是装饰。\n"
+			"- 直接写感受，不要给感受找替身。\n\n"
+		)
+		return base_prompt + "\n\n" + disclaimer + ref
 	return base_prompt
 
 
