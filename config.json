@@ -31,14 +31,6 @@
         "purpose": "deai",
         "label_hint": "35B Aggressive-Q4_K_M — 创意脑洞/反常规改写"
       },
-      "elisnovel-v3-32b": {
-        "purpose": "writing",
-        "label_hint": "ElisNovel 32B Q6_K — 网文专项/精品执笔"
-      },
-      "qwen3.5-27b-webnovel-writer": {
-        "purpose": "writing",
-        "label_hint": "WebNovel Writer 27B Q6_K — 中文网文专精"
-      },
       "qwen3.6-35b-opus": {
         "base_url": "http://127.0.0.1:61183/v1",
         "label": "qwen3.6-35b-opus"
