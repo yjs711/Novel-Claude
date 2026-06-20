@@ -1021,3 +1021,114 @@ def graph_materials(genre, style):
     notes = researcher.research_materials(g, s)
     print(notes[:2000])
     print(f"\n✅ 素材笔记已保存到 {NOVEL_DIR / 'materials' / '素材笔记.md'}")
+
+
+@graph.command("branch")
+@click.argument("name")
+def graph_branch(name):
+    """创建大纲分支（辰东模式: 大纲是方向不是枷锁）"""
+    from utils.config import NOVEL_DIR
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(NOVEL_DIR)
+    path = engine.branch(name)
+    if path:
+        print(f"\n✅ 分支已创建: {name}")
+        print(f"   文件: {path}")
+    else:
+        print("\n❌ 无大纲文件, 无法创建分支")
+
+
+@graph.command("branches")
+def graph_branches():
+    """列出所有大纲分支"""
+    from utils.config import NOVEL_DIR
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(NOVEL_DIR)
+    branches = engine.list_branches()
+    versions = engine.list_versions()
+    print(f"\n分支: {branches if branches else '(无)'}")
+    print(f"版本快照 ({len(versions)}个):")
+    for v in versions[:10]:
+        print(f"  {v['time']} | {v['label']} | {v['hash']}")
+
+
+@graph.command("switch-branch")
+@click.argument("name")
+def graph_switch_branch(name):
+    """切换到大纲分支"""
+    from utils.config import NOVEL_DIR
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(NOVEL_DIR)
+    if engine.switch_branch(name):
+        print(f"\n✅ 已切换到分支: {name}")
+    else:
+        print(f"\n❌ 分支不存在: {name}")
+
+
+@graph.command("check-impact")
+@click.argument("chapter", type=int)
+@click.option("--title", type=str, help="修改后的标题")
+@click.option("--emotion", type=str, help="修改后的情感")
+@click.option("--summary", type=str, help="修改后的概要")
+def graph_check_impact(chapter, title, emotion, summary):
+    """检测修改某章对后续章节的影响（辰东模式）"""
+    from utils.config import NOVEL_DIR
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(NOVEL_DIR)
+    changes = {}
+    if title: changes["title"] = title
+    if emotion: changes["emotional_beat"] = emotion
+    if summary: changes["summary"] = summary
+    if not changes:
+        print("请至少指定一个修改项 (--title/--emotion/--summary)")
+        return
+    result = engine.check_impact(chapter, changes)
+    print(f"\n📊 第{chapter}章修改影响分析:")
+    print(f"  影响章节: {result['impacted_chapters']} 个")
+    for item in result.get("impacted_details", []):
+        print(f"    ch{item.get('chapter',item.get('range','?'))}: {item.get('reason','')[:60]}")
+    if result.get("warnings"):
+        print(f"  ⚠️ 警告:")
+        for w in result["warnings"]: print(f"    {w}")
+    print(f"\n  💡 {result['suggestion']}")
+
+
+@graph.command("apply-change")
+@click.argument("chapter", type=int)
+@click.option("--title", type=str)
+@click.option("--emotion", type=str)
+@click.option("--summary", type=str)
+@click.option("--cascade/--no-cascade", default=True, help="是否标记下游章节需复查")
+def graph_apply_change(chapter, title, emotion, summary, cascade):
+    """应用大纲修改，可选级联标记下游"""
+    from utils.config import NOVEL_DIR
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(NOVEL_DIR)
+    changes = {}
+    if title: changes["title"] = title
+    if emotion: changes["emotional_beat"] = emotion
+    if summary: changes["summary"] = summary
+    if not changes:
+        print("请至少指定一个修改项")
+        return
+    result = engine.apply_change(chapter, changes, cascade=cascade)
+    if result:
+        print(f"\n✅ 第{chapter}章已修改, 影响{result['impacted_chapters']}个章节")
+    else:
+        print(f"\n✅ 第{chapter}章已修改")
+    engine.save_version(f"manual_ch{chapter}")
+
+
+@graph.command("review-needed")
+def graph_review_needed():
+    """列出所有标记为需复查的章节"""
+    from utils.config import NOVEL_DIR
+    from core.outline_branch import OutlineBranchEngine
+    engine = OutlineBranchEngine(NOVEL_DIR)
+    items = engine.list_review_needed()
+    if items:
+        print(f"\n📋 需复查章节 ({len(items)}个):")
+        for item in items:
+            print(f"  第{item['chapter']}章: {item['title']} — {item['reason']}")
+    else:
+        print("\n✅ 无待复查章节")
