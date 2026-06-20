@@ -1679,6 +1679,106 @@ async def read_chapter_file(vol: str = "", num: int = 0):
         "vol": vol, "number": num,
     }
 
+# ── 因果图引擎 Web API ─────────────────────────────────────
+
+@app.get("/api/causal-graph/summary")
+async def causal_graph_summary():
+    """获取因果图引擎概览"""
+    try:
+        novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+        novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+        if not (novel_path / "causal_graph.json").exists():
+            return {"available": False}
+
+        from core.causal_graph import CausalGraphEngine
+        engine = CausalGraphEngine(novel_path)
+        return {"available": True, **engine.get_summary()}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.get("/api/causal-graph/characters")
+async def causal_graph_characters():
+    """获取角色关系图数据（用于 D3 力导向图）"""
+    try:
+        novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+        novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+        if not (novel_path / "causal_graph.json").exists():
+            return {"available": False}
+
+        from core.causal_graph import CausalGraphEngine
+        engine = CausalGraphEngine(novel_path)
+        engine._ensure_characters_from_events()
+
+        nodes = []
+        links = []
+        for c in engine.characters.values():
+            nodes.append({
+                "id": c.id,
+                "name": c.name,
+                "role": c.role or "unknown",
+                "goalCount": len([g for g in c.goals if g.status == "active"]),
+                "firstAppearance": c.first_appearance,
+                "lastAppearance": c.last_appearance,
+            })
+            for rid, rel in c.relationships.items():
+                if rid in engine.characters and c.id < rid:  # 避免重复边
+                    links.append({
+                        "source": c.id,
+                        "target": rid,
+                        "type": rel.rel_type,
+                        "intensity": rel.intensity,
+                        "historyCount": len(rel.history),
+                    })
+
+        return {"available": True, "nodes": nodes, "links": links}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.get("/api/causal-graph/events")
+async def causal_graph_events(chapter: int = 0):
+    """获取事件因果图数据"""
+    try:
+        novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+        novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+        if not (novel_path / "causal_graph.json").exists():
+            return {"available": False}
+
+        from core.causal_graph import CausalGraphEngine
+        engine = CausalGraphEngine(novel_path)
+
+        if chapter > 0:
+            events = engine.get_chapter_events(chapter)
+        else:
+            events = sorted(engine.events.values(), key=lambda e: (e.chapter, e.id))[-50:]
+
+        nodes = []
+        links = []
+        event_ids = set()
+        for e in events:
+            event_ids.add(e.id)
+            nodes.append({
+                "id": e.id,
+                "chapter": e.chapter,
+                "stac": e.stac_type,
+                "summary": e.summary[:50],
+                "participants": e.participants[:3],
+                "emotional": e.emotional_valence,
+            })
+
+        # 边（只展示在所选集内的事件之间的因果链接）
+        for e in events:
+            for cause_id in e.causes:
+                if cause_id in event_ids:
+                    links.append({"source": cause_id, "target": e.id})
+
+        threads = engine.get_active_threads()
+        return {"available": True, "nodes": nodes, "links": links, "activeThreads": len(threads)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
 # ── 通用改写（去AI味 + 自定义要求） ────────────────────────────
 
 @app.post("/api/deai-rewrite")
