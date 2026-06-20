@@ -569,6 +569,13 @@ async def write_stream(request: Request):
 
             system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""),
                                                    emotion=auto_emotion)
+            # 注入章节摘要上下文 (CogWriter 增量压缩)
+            from core.context_manager import ChapterSummarizer, ContextBudgetManager
+            summarizer = ChapterSummarizer(Path(f".novel_{novel_dir}" if novel_dir else ".novel"))
+            recent_ctx = summarizer.get_recent_context(3)
+            if recent_ctx:
+                system_prompt += f"\n\n【前情摘要】: {recent_ctx}"
+
             system_prompt += _build_causal_context(chapter)
 
             # 注入素材笔记 (乌贼模式: 真实细节)
@@ -680,6 +687,10 @@ async def write_stream(request: Request):
                         # 伏笔随手扔 (乌贼模式)
                         from core.material_research import LooseForeshadowScanner
                         LooseForeshadowScanner.save_hooks(novel_path, chapter, full_content)
+                        # 增量摘要 (CogWriter本地优化)
+                        from core.context_manager import ChapterSummarizer
+                        summarizer = ChapterSummarizer(novel_path)
+                        summarizer.summarize_chapter(chapter, full_content)
                         return audit
                     except Exception:
                         return None
