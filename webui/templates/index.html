@@ -344,9 +344,16 @@ textarea { resize: vertical; }
     <button class="btn-secondary btn-sm" onclick="toggleWizard()">故事蓝图</button>
     <button class="btn-secondary btn-sm" onclick="doSaveSnapshot()">保存快照</button>
     <span class="sep"></span>
-    <button class="btn-secondary btn-xs" onclick="toggleFocus()" title="专注模式">专注</button>
-    <button class="btn-secondary btn-xs" onclick="toggleTheme()" id="btnTheme" title="切换亮色/暗色模式" style="font-size:14px;padding:2px 6px">☀️</button>
+    <button class="btn-secondary btn-xs" onclick="branchOutline()" title="创建大纲分支">⎇分支</button>
+    <button class="btn-secondary btn-xs" onclick="checkOutlineImpact()" title="检测修改影响">🔍影响</button>
     <span id="tbStatus" style="margin-left:auto;font-size:11px;color:var(--text3)"></span>
+  </div>
+
+  <!-- ── 系统状态栏 ── -->
+  <div id="sysStatusBar" style="display:flex;align-items:center;gap:16px;padding:3px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;color:var(--text2);flex-shrink:0">
+    <span>👤角色:<b id="statChars" style="color:var(--accent)">-</b></span>
+    <span>📌伏笔:<b id="statForeshadows" style="color:var(--accent)">-</b></span>
+    <span id="statReview" style="color:var(--danger);display:none;cursor:pointer;margin-left:auto" onclick="loadReviewNeeded()">⚠ 待复查</span>
   </div>
 
   <!-- ── AI改写栏 ── -->
@@ -371,11 +378,6 @@ textarea { resize: vertical; }
         <span>速度: <b id="statSpeed">0</b> 字/分</span>
         <span>用时: <b id="statTime">00:00</b></span>
         <span>门控: <b id="statGate">--</b></span>
-        <span>角色: <b id="statChars" title="活跃角色数">-</b></span>
-        <span>伏笔: <b id="statForeshadows" title="活跃伏笔数">-</b></span>
-        <span style="margin-left:auto">
-          <span id="statReview" style="color:var(--danger);display:none;cursor:pointer" title="需复查的章节" onclick="loadReviewNeeded()">⚠ 复查</span>
-        </span>
         <span id="statSave">就绪</span>
       </div>
     </div>
@@ -1220,6 +1222,31 @@ function loadReviewNeeded() {
     if (!d.items || d.items.length===0) { showToast('无待复查章节'); return; }
     var msg = '需复查章节:\\n' + d.items.map(function(i){return '第'+i.chapter+'章: '+i.reason}).join('\\n');
     showToast(msg, false, 8000);
+  });
+}
+
+function branchOutline() {
+  var name = prompt('分支名称（如: alternative_ending）:');
+  if (!name) return;
+  showToast('正在创建分支...');
+  fetch('/api/outline/branch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}).then(function(r){return r.json()}).then(function(d){
+    if (d.ok) showToast('分支已创建: '+ name);
+    else showToast('创建失败: 无大纲文件', true);
+  });
+}
+
+function checkOutlineImpact() {
+  var ch = prompt('检测修改第几章的影响？');
+  if (!ch) return;
+  var chNum = parseInt(ch);
+  var emo = prompt('修改后的情感？（可选: sorrow/anger/fear/joy/love/loneliness/warmth/humor/awe/despair/tension）') || '';
+  showToast('正在检测...');
+  var changes = {};
+  if (emo) changes.emotional_beat = emo;
+  fetch('/api/outline/check-impact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chapter:chNum,changes:changes})}).then(function(r){return r.json()}).then(function(d){
+    if (d.error) { showToast(d.error, true); return; }
+    var msg = '影响 '+d.impacted_chapters+' 个章节:\\n' + d.suggestion;
+    showToast(msg, false, 10000);
   });
 }
 
