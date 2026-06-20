@@ -75,8 +75,14 @@ class ColoredConsoleHandler(logging.StreamHandler):
     def emit(self, record):
         color = self.COLORS.get(record.levelname, "")
         msg = self.format(record)
-        self.stream.write(f"{color}{msg}{self.RESET}\n")
-        self.flush()
+        try:
+            self.stream.write(f"{color}{msg}{self.RESET}\n")
+            self.flush()
+        except UnicodeEncodeError:
+            # Windows GBK 控制台无法编码 ✓ 等 Unicode 字符时，用纯 ASCII 回退
+            safe_msg = msg.encode(self.stream.encoding or 'ascii', errors='replace').decode(self.stream.encoding or 'ascii', errors='replace')
+            self.stream.write(f"{color}{safe_msg}{self.RESET}\n")
+            self.flush()
 
 
 # ── custom levels ─────────────────────────────────────────────────────────────

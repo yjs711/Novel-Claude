@@ -7,6 +7,16 @@ import json, os, sys, time, asyncio, io
 from pathlib import Path
 from typing import Optional, AsyncGenerator
 
+# ── Windows UTF-8 编码修复 ──
+if sys.platform == "win32":
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    os.environ.setdefault("PYTHONUTF8", "1")
+
 # Add parent dir to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -467,6 +477,7 @@ async def write_stream(request: Request):
         import json as _json
 
         cfg = load_cfg()
+        novel_dir = cfg.get("workspace", {}).get("novel_name", "")
         gen = cfg.get("generation", {})
         wf_mode = cfg.get("workflow", {}).get("mode", "quick")
 
@@ -2339,22 +2350,38 @@ async def init_novel(request: Request):
         return {"error": "logline required"}
 
     import subprocess
+    # 传递 UTF-8 环境变量，防止子进程 GBK 编码崩溃
+    sub_env = os.environ.copy()
+    sub_env.setdefault("PYTHONIOENCODING", "utf-8")
+    sub_env.setdefault("PYTHONUTF8", "1")
     result = subprocess.run(
         [sys.executable, "cli.py", "init", logline],
-        capture_output=True, text=True, cwd=str(Path(__file__).parent.parent), timeout=300
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=str(Path(__file__).parent.parent), timeout=300, env=sub_env
     )
+    # 检查 init 是否成功：验证关键文件是否生成
+    novel_name = load_cfg().get("workspace", {}).get("novel_name", "")
+    base = Path(f".novel_{novel_name}" if novel_name else ".novel")
+    has_settings = (base / "settings" / "one_sentence.json").exists()
+    has_volumes = list((base / "volumes").glob("vol_*_chapters")) if (base / "volumes").exists() else []
+    init_ok = result.returncode == 0 and has_settings
     # 自动生成素材笔记 (乌贼模式: init时自动触发)
     genre = data.get("genre", load_cfg().get("genre", "修仙"))
     style = data.get("style", load_cfg().get("style", "网文爽文"))
     async def _gen_materials():
         try:
-            novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
-            novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
             from core.material_research import MaterialResearcher
-            MaterialResearcher(novel_path).research_materials(genre, style)
+            MaterialResearcher(base).research_materials(genre, style)
         except Exception: pass
     asyncio.ensure_future(_gen_materials())
-    return {"ok": True, "output": result.stdout + result.stderr}
+    return {
+        "ok": init_ok,
+        "output": result.stdout[-2000:] + result.stderr[-2000:],
+        "returncode": result.returncode,
+        "has_settings": has_settings,
+        "has_volumes": bool(has_volumes),
+        "warning": "" if init_ok else "世界观初始化不完整，请检查模型连接后重试 init，或手动执行 python cli.py plan 生成大纲"
+    }
 
 @app.post("/api/plan")
 async def plan_novel(request: Request):
@@ -2364,9 +2391,12 @@ async def plan_novel(request: Request):
     args = [sys.executable, "cli.py", "plan"]
     if volume:
         args.extend(["--volume", str(volume)])
-    result = subprocess.run(args, capture_output=True, text=True,
-                            cwd=str(Path(__file__).parent.parent), timeout=300)
-    return {"ok": True, "output": result.stdout + result.stderr}
+    sub_env = os.environ.copy()
+    sub_env.setdefault("PYTHONIOENCODING", "utf-8")
+    sub_env.setdefault("PYTHONUTF8", "1")
+    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                            cwd=str(Path(__file__).parent.parent), timeout=300, env=sub_env)
+    return {"ok": result.returncode == 0, "output": result.stdout[-3000:] + result.stderr[-3000:]}
 
 
 # ── new module endpoints ─────────────────────────────────────────────────────

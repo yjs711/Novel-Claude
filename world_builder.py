@@ -389,6 +389,8 @@ def run_world_builder(logline: str, step: str = None):
     """
     Main entry point. If step is specified, run only that step.
     Otherwise run all 4 steps in sequence.
+    Each step is wrapped in try/except — one step failing does not prevent
+    subsequent steps from running.
     """
     if step == "goldfinger":
         return run_init(logline)
@@ -399,13 +401,23 @@ def run_world_builder(logline: str, step: str = None):
     elif step == "blueprint":
         return run_blueprint()
     else:
-        # Run all steps in sequence
-        run_init(logline)
-        run_expand()
-        run_world()
-        run_blueprint()
-        print("[✓] 世界观构建完成！")
-        return True
+        # Run all steps in sequence, best-effort
+        ok = True
+        for fn, name in [(run_init, "s01-init"), (run_expand, "s02-expand"),
+                          (run_world, "s03-world"), (run_blueprint, "s04-blueprint")]:
+            try:
+                if name == "s01-init":
+                    fn(logline)
+                else:
+                    fn()
+            except Exception as e:
+                print(f"[⚠️ {name}] 步骤失败: {e}")
+                ok = False
+        if ok:
+            print("[✓] 世界观构建完成！")
+        else:
+            print("[!] 世界观构建部分失败，已生成的项目可手动补充缺失文件")
+        return ok
 
 
 def render_all():

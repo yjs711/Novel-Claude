@@ -3,6 +3,19 @@ import os
 import sys
 from datetime import datetime
 
+# ── Windows UTF-8 编码修复：防止 GBK 控制台导致 UnicodeEncodeError ──
+# 在所有输出之前设置，确保 ✓ 等 Unicode 字符不会因 GBK 编码崩溃
+if sys.platform == "win32":
+    # 方法1: 重配置 stdout/stderr 为 UTF-8
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    # 方法2: 设置环境变量让 Python 子进程也使用 UTF-8
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    os.environ.setdefault("PYTHONUTF8", "1")
+
 # ── Logging: configure ONCE before everything ──
 from utils.logger import setup_logging
 setup_logging()

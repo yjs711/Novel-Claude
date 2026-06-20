@@ -20,6 +20,7 @@ from utils.llm_client import ProgressiveWriter, generate_stream
 from core.context_assembler import assemble_context, get_assembler
 from core.event_bus import event_bus
 from utils.logger import get_logger, log_step
+from world_builder import load_setting_chunk
 
 logger = get_logger(__name__)
 from utils.chapter_state import get_state_manager, STATE_PENDING, STATE_GENERATING, STATE_COMPLETED, STATE_FAILED
@@ -141,6 +142,64 @@ def load_world_setting() -> dict:
     return {}
 
 
+def _build_fallback_overview(volume_id: int, chapter_id: int) -> str:
+    """当章节细纲缺失时，从世界观文件和卷大纲构建回退概览。
+    确保新手项目（init 后未 plan）也能生成第一章。"""
+    parts = []
+    # 1. 从一句话梗概获取故事核心
+    one_sentence = load_setting_chunk("one_sentence")
+    if one_sentence:
+        content = one_sentence.get("content", one_sentence)
+        sentence = content.get("one_sentence", "")
+        theme = content.get("theme", "")
+        if sentence:
+            parts.append(f"故事核心: {sentence}")
+        if theme:
+            parts.append(f"主题: {theme}")
+
+    # 2. 从故事大纲获取概览
+    story_outline = load_setting_chunk("story_outline")
+    if story_outline:
+        content = story_outline.get("content", story_outline)
+        overview = content.get("overview", "")
+        if overview:
+            parts.append(f"故事背景: {overview[:500]}")
+
+    # 3. 从卷大纲获取本章定位
+    vol_outline = load_volume_outline(volume_id)
+    if vol_outline:
+        vol_overview = vol_outline.get("overview", "")
+        if vol_overview:
+            parts.append(f"本卷目标: {vol_overview[:300]}")
+
+    # 4. 从世界观获取世界规则
+    world_setting = load_setting_chunk("world_setting")
+    if world_setting:
+        content = world_setting.get("content", world_setting)
+        world_view = content.get("world_view", "")
+        if world_view:
+            parts.append(f"世界观: {world_view[:300]}")
+        factions = content.get("major_power_camps", [])
+        if factions:
+            faction_names = [f.get("name", "") for f in factions[:3]]
+            parts.append(f"主要势力: {', '.join(faction_names)}")
+
+    # 5. 从核心蓝图获取角色
+    blueprint = load_setting_chunk("core_blueprint")
+    if blueprint:
+        content = blueprint.get("content", blueprint)
+        chars = content.get("character_cards", [])
+        if chars:
+            main_char = chars[0]
+            parts.append(f"主角: {main_char.get('name', '?')} — {main_char.get('description', '')[:100]}")
+
+    if not parts:
+        return f"第{chapter_id}章，故事开篇。请根据小说类型和风格自然展开。"
+
+    parts.append(f"本章为第{chapter_id}章{'（开篇第一章）' if chapter_id == 1 else ''}，请根据以上设定自然展开故事。")
+    return "\n".join(parts)
+
+
 def load_writing_guide(volume_id: int) -> Optional[str]:
     """Load writing guide for the volume if exists."""
     path = Path(VOLUMES_DIR) / f"vol_{volume_id:02d}_writing_guide.json"
@@ -198,7 +257,8 @@ def _load_foreshadowing_context(chapter_id: int) -> str:
 def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = None,
                          overview: str = None, entities: dict = None) -> str:
     """Build the full writing prompt for a chapter. Shared between CLI and WebUI.
-    All parameters are optional — if not provided, they are loaded from disk."""
+    All parameters are optional — if not provided, they are loaded from disk.
+    Returns a prompt string; NEVER returns None (falls back to minimal prompt)."""
     # Load from disk if not provided
     entity_list = []
     if chapter_title is None or overview is None:
@@ -209,7 +269,9 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
             entity_list = outline.get("entity_list", [])
         else:
             chapter_title = chapter_title or f"第{chapter_id}章"
-            overview = overview or ""
+            # 回退：从世界观文件构建基本概览（无细纲时自动生成基础提示）
+            overview = overview or _build_fallback_overview(volume_id, chapter_id)
+            logger.info("No chapter outline for vol%d ch%d, using fallback overview", volume_id, chapter_id)
 
     if entities is None:
         entities = load_entity_cards(entity_list)
