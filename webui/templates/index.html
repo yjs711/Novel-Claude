@@ -1831,6 +1831,47 @@ function generatePOV() {
 }
 
 // ── Module 3: 冲突注入器 ──
+function runPropel() {
+  var text = el('propelInput') ? el('propelInput').value.trim() : '';
+  if (!text) { showToast('请输入当前场景', true); return; }
+  var out = el('propelOutput');
+  if (out) {
+    out.innerHTML = '<div style=\"padding:8px;color:var(--text2)\">正在推演...</div>';
+    apiPost('/api/workshop/chat', {messages: [{role:'user',content:'基于以下场景，推演3条不同的故事走向，每条50-100字：'+text}]}, 60000).then(function(r){
+      if (r && r.text) { out.innerHTML = '<pre style=\"white-space:pre-wrap;font-size:12px\">'+escHtml(r.text)+'</pre>'; }
+      else { out.innerHTML = '<span style=\"color:var(--danger)\">推演失败</span>'; }
+    });
+  }
+}
+
+function runPlotFlip() {
+  var text = el('flipInput') ? el('flipInput').value.trim() : '';
+  if (!text) { showToast('请输入剧情段落', true); return; }
+  var out = el('flipOutput');
+  if (out) {
+    out.innerHTML = '<div style=\"padding:8px;color:var(--text2)\">正在翻新...</div>';
+    apiPost('/api/workshop/chat', {messages: [{role:'user',content:'对以下剧情进行180度翻转，给出意想不到但合理的发展：'+text}]}, 60000).then(function(r){
+      if (r && r.text) { out.innerHTML = '<pre style=\"white-space:pre-wrap;font-size:12px\">'+escHtml(r.text)+'</pre>'; }
+      else { out.innerHTML = '<span style=\"color:var(--danger)\">翻新失败</span>'; }
+    });
+  }
+}
+
+function runPOVSwitch() {
+  var sel = el('povSwitcher');
+  var pov = sel ? sel.value : '配角视角';
+  var text = el('povInput') ? el('povInput').value.trim() : '';
+  if (!text) { showToast('请输入场景', true); return; }
+  var out = el('povOutput');
+  if (out) {
+    out.innerHTML = '<div style=\"padding:8px;color:var(--text2)\">正在以['+pov+']视角重写...</div>';
+    apiPost('/api/workshop/chat', {messages: [{role:'user',content:'以【'+pov+'】的视角重新叙述以下场景，保持剧情不变：'+text}]}, 60000).then(function(r){
+      if (r && r.text) { out.innerHTML = '<pre style=\"white-space:pre-wrap;font-size:12px\">'+escHtml(r.text)+'</pre>'; }
+      else { out.innerHTML = '<span style=\"color:var(--danger)\">切换失败</span>'; }
+    });
+  }
+}
+
 function injectConflict(type) {
   var out = el('conflictOutput');
   if (!out) return;
