@@ -529,6 +529,16 @@ async def write_stream(request: Request):
 
             # 自动检测大纲情感基调（零手动操作）
             auto_emotion = data.get("emotion", "")
+            # 优先读取大纲中预设的情感标注
+            if not auto_emotion:
+                try:
+                    from scene_writer import load_chapter_outline
+                    outline = load_chapter_outline(volume, chapter)
+                    if outline and outline.get("emotional_beat") and outline["emotional_beat"] != "自动":
+                        auto_emotion = outline["emotional_beat"]
+                except Exception:
+                    pass
+            # 其次自动检测
             if not auto_emotion and prompt:
                 auto_emotion = EmotionAnalyzer.detect_from_outline(prompt, chapter)
             if auto_emotion:
@@ -1180,7 +1190,8 @@ def _empty_chapter(num, target_words=3000):
     return {
         "number": num, "title": "", "pov": "", "status": "planned",
         "word_target": target_words, "summary": "",
-        "scenes": [], "satisfaction_beat": "", "emotional_beat": "", "ending_hook": "",
+        "scenes": [], "satisfaction_beat": "", "emotional_beat": "自动",
+        "emotion_curve": "", "ending_hook": "",
         "plot_advances": [], "character_moments": {}
     }
 
@@ -1201,11 +1212,12 @@ def _outline_to_markdown(outline):
             lines.append(f"**目的**: {vol['purpose']}")
         lines.append(f"**进度**: {done}/{vol.get('chapter_count', 0)}")
         lines.append("")
-        lines.append("| 章 | 标题 | POV | 概要 | 爽点 | 钩子 | 状态 |")
-        lines.append("|---|------|-----|------|------|------|------|")
+        lines.append("| 章 | 标题 | POV | 情感 | 概要 | 爽点 | 钩子 | 状态 |")
+        lines.append("|---|------|-----|------|------|------|------|------|")
         for ch in vol.get("chapters_list", []):
             status = {"planned":"计划","outlined":"已规划","detailed":"细纲","writing":"写作中","done":"完成"}.get(ch.get("status",""), ch.get("status",""))
-            lines.append(f"| {ch['number']} | {ch.get('title','')[:15]} | {ch.get('pov','')[:8]} | {ch.get('summary','')[:30]} | {ch.get('satisfaction_beat','')[:15]} | {ch.get('ending_hook','')[:20]} | {status} |")
+            emo = ch.get("emotional_beat","")[:4] or "自动"
+            lines.append(f"| {ch['number']} | {ch.get('title','')[:12]} | {ch.get('pov','')[:6]} | {emo} | {ch.get('summary','')[:25]} | {ch.get('satisfaction_beat','')[:12]} | {ch.get('ending_hook','')[:15]} | {status} |")
         lines.append("")
     return "\n".join(lines)
 
@@ -1279,6 +1291,10 @@ async def generate_chapter_outline(request: Request):
 ## 本章概要
 [2-3句话概括本章核心剧情]
 
+## 情感基调检测
+**本章主导情感**: 从以下选择：悲伤/愤怒/恐惧/喜悦/爱/孤独/温暖/幽默/震撼/绝望/紧张
+**情感曲线**: 开端(→情感)→发展(→情感)→高潮(→情感)→回落(→情感)
+
 ## 场景分解
 ### 场景1: [场景名]
 - **地点**:
@@ -1287,6 +1303,7 @@ async def generate_chapter_outline(request: Request):
 - **目标**:
 - **冲突**:
 - **结局**:
+- **情感标签**: [本场景主导情感]
 - **字数分配**: ~[800]字
 
 ### 场景2: [场景名]
@@ -1294,9 +1311,6 @@ async def generate_chapter_outline(request: Request):
 
 ## 本章爽点
 - [列出本章的读者爽点/燃点]
-
-## 情感节奏
-- [情绪曲线：开端→发展→高潮→回落]
 
 ## 伏笔管理
 - **埋下**:
@@ -1308,6 +1322,7 @@ async def generate_chapter_outline(request: Request):
 ## 写作提示
 - 对话占40-60%
 - 节奏：快→慢→快
+- 按场景情感标签控制情绪输出
 - 注意：不要写成流水账，每个场景要有冲突和推进"""
 
     async def generate():
