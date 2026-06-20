@@ -106,11 +106,14 @@ def list_styles() -> list[str]:
 	return [p.stem for p in _STYLE_DIR.glob("*.md")]
 
 
-def inject_style_reference(base_prompt: str, style: str, genre: str = "") -> str:
+def inject_style_reference(base_prompt: str, style: str, genre: str = "", scene: str = "") -> str:
 	"""
-	将匹配的风格参照注入到提示词末尾。
-	返回 base_prompt + 风格参照（如果有匹配）。
+	将匹配的风格参照 + 场景参照注入到提示词末尾。
+	scene: 可选场景类型 (battle/romance/horror/triumph/breakthrough/dialogue)
 	"""
+	parts = []
+
+	# 风格参照
 	ref = match_style_reference(style, genre)
 	if ref:
 		disclaimer = (
@@ -120,7 +123,16 @@ def inject_style_reference(base_prompt: str, style: str, genre: str = "") -> str
 			"- 学习的是\"怎么推进叙事\"，不是\"怎么堆比喻\"\n"
 			"- 如果写比喻：问自己\"删掉它读者还理解吗\"——能则删，不能则留\n\n"
 		)
-		return base_prompt + "\n\n" + disclaimer + ref
+		parts.append(disclaimer + ref)
+
+	# 场景参照
+	if scene:
+		scene_ref = load_style_reference(f"scene-{scene}")
+		if scene_ref:
+			parts.append(f"\n\n---\n**场景参照（{scene}场景写作范本）：**\n\n" + scene_ref)
+
+	if parts:
+		return base_prompt + "\n\n" + "\n".join(parts)
 	return base_prompt
 
 

@@ -1,4 +1,11 @@
 {
+  "_comment": "风格→参照 映射。scene_* 为场景型参照，按写作场景类型匹配。",
+  "scene_battle": "scene-battle-action",
+  "scene_romance": "scene-romance",
+  "scene_horror": "scene-horror",
+  "scene_triumph": "scene-triumph",
+  "scene_breakthrough": "scene-breakthrough",
+  "scene_dialogue": "scene-daily-dialogue",
   "金庸武侠": "wuxia-traditional",
   "古龙风格": "wuxia-minimalist",
   "网文爽文": "webnovel-power-fantasy",
