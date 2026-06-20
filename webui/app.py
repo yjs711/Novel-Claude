@@ -2343,6 +2343,17 @@ async def init_novel(request: Request):
         [sys.executable, "cli.py", "init", logline],
         capture_output=True, text=True, cwd=str(Path(__file__).parent.parent), timeout=300
     )
+    # 自动生成素材笔记 (乌贼模式: init时自动触发)
+    genre = data.get("genre", load_cfg().get("genre", "修仙"))
+    style = data.get("style", load_cfg().get("style", "网文爽文"))
+    async def _gen_materials():
+        try:
+            novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+            novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+            from core.material_research import MaterialResearcher
+            MaterialResearcher(novel_path).research_materials(genre, style)
+        except Exception: pass
+    asyncio.ensure_future(_gen_materials())
     return {"ok": True, "output": result.stdout + result.stderr}
 
 @app.post("/api/plan")

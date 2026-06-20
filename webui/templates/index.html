@@ -375,7 +375,6 @@ textarea { resize: vertical; }
         <span>伏笔: <b id="statForeshadows" title="活跃伏笔数">-</b></span>
         <span style="margin-left:auto">
           <span id="statReview" style="color:var(--danger);display:none;cursor:pointer" title="需复查的章节" onclick="loadReviewNeeded()">⚠ 复查</span>
-          <span id="statMaterials" style="color:var(--accent);cursor:pointer" title="生成世界素材" onclick="generateMaterials()">📝素材</span>
         </span>
         <span id="statSave">就绪</span>
       </div>
@@ -1215,17 +1214,6 @@ function refreshStatusIndicators() {
   });
 }
 setTimeout(refreshStatusIndicators, 2000);
-
-function generateMaterials() {
-  var g = (el('selGenre')||{}).value || '修仙';
-  var s = (el('selStyle')||{}).value || '网文爽文';
-  showToast('正在生成世界素材...');
-  fetch('/api/materials/generate', {method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({genre:g, style:s})}).then(function(r){return r.json()}).then(function(d){
-    if (d.ok) showToast('素材笔记已生成: '+Math.round(d.length/1000)+'K字');
-    else showToast('素材生成失败', true);
-  });
-}
 
 function loadReviewNeeded() {
   fetch('/api/outline/review-needed').then(function(r){return r.json()}).then(function(d){
