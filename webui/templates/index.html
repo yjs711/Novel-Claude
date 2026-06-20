@@ -309,6 +309,20 @@ textarea { resize: vertical; }
   <div class="toolbar" id="toolbar">
     <select id="selGenre" title="体裁"></select>
     <select id="selStyle" title="风格"></select>
+    <select id="selEmotion" title="情感基调" style="width:90px;padding:4px 8px;font-size:12px">
+      <option value="">情感:自动</option>
+      <option value="sorrow">悲伤</option>
+      <option value="anger">愤怒</option>
+      <option value="fear">恐惧</option>
+      <option value="joy">喜悦</option>
+      <option value="love">爱</option>
+      <option value="loneliness">孤独</option>
+      <option value="warmth">温暖</option>
+      <option value="humor">幽默</option>
+      <option value="awe">震撼</option>
+      <option value="despair">绝望</option>
+      <option value="tension">紧张</option>
+    </select>
     <span class="sep"></span>
     <input type="number" id="selVolume" value="1" min="1" style="width:50px" title="卷号">
     <span style="color:var(--text3)">卷</span>
@@ -1078,7 +1092,7 @@ function doGenerate() {
   fetch('/api/write-stream?mode=' + mode, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({volume: vol, chapter: ch}),
+    body: JSON.stringify({volume: vol, chapter: ch, emotion: (el('selEmotion')||{}).value || ''}),
     signal: ac.signal
   }).then(function(resp) {
     if (!resp.ok) { throw new Error('HTTP ' + resp.status); }
@@ -1288,7 +1302,7 @@ function doRewriteExec() {
 
   fetch('/api/deai-rewrite', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({content: selText, full_text: ta.value, chapter: ch, prompt: promptText}),
+    body: JSON.stringify({content: selText, full_text: ta.value, chapter: ch, prompt: promptText, emotion: (el('selEmotion')||{}).value || ''}),
     signal: ac.signal
   }).then(function(resp) {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);

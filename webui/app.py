@@ -524,7 +524,8 @@ async def write_stream(request: Request):
 
             from utils.prompt_loader import writing_prompt, inject_style_reference
             system_prompt = writing_prompt() + _build_genre_style_injection(cfg)
-            system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""))
+            system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""),
+                                                   emotion=data.get("emotion", ""))
             system_prompt += _build_causal_context(chapter)
             # 用 Queue 在线程和事件循环之间传递 token
             token_queue: asyncio.Queue = asyncio.Queue()
@@ -1881,7 +1882,8 @@ async def deai_rewrite(request: Request):
 6. 情绪不直说，用动作和环境呈现
 7. 保持原文剧情走向，直接输出改写后的完整正文"""
 
-    system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""))
+    system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""),
+                                               emotion=data.get("emotion", ""))
 
     async def generate():
         try:
