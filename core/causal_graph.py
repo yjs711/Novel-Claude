@@ -127,6 +127,12 @@ class CausalGraphEngine:
                     num = int(node.id.split("_")[-1])
                     self._next_id = max(self._next_id, num + 1)
                 for cd in data.get("characters", []):
+                    # 还原嵌套对象
+                    cd["goals"] = [Goal(**g) if isinstance(g, dict) else g for g in cd.get("goals", [])]
+                    cd["relationships"] = {
+                        k: Relationship(**v) if isinstance(v, dict) else v
+                        for k, v in cd.get("relationships", {}).items()
+                    }
                     char = CharacterNode(**cd)
                     self.characters[char.id] = char
             except Exception as e:
@@ -576,13 +582,26 @@ class CausalGraphEngine:
                 extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
             raw = response.choices[0].message.content
-            # 提取 JSON 数组
+            # 提取 JSON 数组（容错处理）
             match = re.search(r'\[[\s\S]*\]', raw)
             if not match:
-                print(f"  [⚠️] LLM 返回非 JSON 格式: {raw[:200]}")
+                print(f"  [⚠️] LLM 返回非 JSON: {raw[:200]}")
                 return 0
 
-            events_data = json.loads(match.group())
+            json_str = match.group()
+            # 修复常见 JSON 问题: 移除尾随逗号、修复单引号
+            json_str = re.sub(r',\s*]', ']', json_str)
+            json_str = re.sub(r',\s*}', '}', json_str)
+            try:
+                events_data = json.loads(json_str)
+            except json.JSONDecodeError:
+                # 如果失败，尝试用 python literal_eval（兼容单引号）
+                import ast
+                try:
+                    events_data = ast.literal_eval(json_str)
+                except Exception:
+                    print(f"  [⚠️] JSON 解析失败: {json_str[:200]}")
+                    return 0
             count = 0
             for ed in events_data:
                 evt = EventNode(

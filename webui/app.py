@@ -41,6 +41,35 @@ def save_cfg(cfg):
     with open(cfg_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
+def _build_causal_context(chapter: int) -> str:
+    """加载因果图引擎，生成写作前上下文（角色动机+活跃线索）。"""
+    try:
+        novel_dir = load_cfg().get("workspace", {}).get("novel_name", "")
+        novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+        if not (novel_path / "causal_graph.json").exists():
+            return ""
+
+        from core.causal_graph import CausalGraphEngine
+        engine = CausalGraphEngine(novel_path)
+        parts = []
+
+        # 角色动机
+        char_ctx = engine.get_active_characters_context(chapter)
+        if char_ctx:
+            parts.append(f"\n\n【前情与角色状态 (因果引擎)】\n{char_ctx}")
+
+        # 活跃线索
+        threads = engine.get_active_threads()
+        if threads:
+            parts.append(f"\n【请注意以下未闭合的因果线 ({len(threads)}条)】")
+            for t in threads[:8]:
+                parts.append(f"- {t['summary'][:80]}")
+
+        return "\n".join(parts) if parts else ""
+    except Exception:
+        return ""
+
+
 def _build_genre_style_injection(cfg: dict) -> str:
     """从 config 读取 genre/style，构建 prompt 注入文本。
     如果流派/风格未配置或数据库无匹配，返回空字符串。"""
@@ -444,6 +473,10 @@ async def write_stream(request: Request):
                 genre_style = _build_genre_style_injection(cfg)
                 if genre_style:
                     outline["_genre_style_injection"] = genre_style
+                # 注入因果图上下文
+                causal_ctx = _build_causal_context(chapter)
+                if causal_ctx:
+                    outline["_causal_context"] = causal_ctx
 
                 from skills.wf_mo_shen_workflow.skill import WfMoShenWorkflowSkill
                 from core.novel_context import NovelContext
@@ -492,6 +525,7 @@ async def write_stream(request: Request):
             from utils.prompt_loader import writing_prompt, inject_style_reference
             system_prompt = writing_prompt() + _build_genre_style_injection(cfg)
             system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""))
+            system_prompt += _build_causal_context(chapter)
             # 用 Queue 在线程和事件循环之间传递 token
             token_queue: asyncio.Queue = asyncio.Queue()
 
