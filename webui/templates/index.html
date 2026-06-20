@@ -258,6 +258,9 @@ textarea { resize: vertical; }
 .event-item .evt-ch { color: var(--text3); margin-right:4px; }
 .event-item .evt-summary { color: var(--text1); }
 .event-item .evt-chars { color: var(--text2); font-size:10px; }
+.inspire-tabs .tab-btn { border:none; background:transparent; color:var(--text2); cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; padding:4px 6px; }
+.inspire-tabs .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+.inspire-tabs .tab-btn:hover { color:var(--text1); }
 </style>
 </head>
 <body>
@@ -545,160 +548,138 @@ textarea { resize: vertical; }
     <button class="panel-toggle" onclick="togglePanel('panelRight2')">&#9776;</button>
   </div>
   <div class="panel-body">
-    <!-- Module 0: 因果图 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 因果图 <span id="causalBadge" style="font-size:10px;color:var(--text3)"></span>
-      </div>
-      <div class="inspire-body">
-        <div class="causal-legend">
-          <span><span class="dot" style="background:var(--accent)"></span> 主角</span>
-          <span><span class="dot" style="background:var(--text3)"></span> 配角</span>
-          <span><span class="dot" style="background:var(--danger)"></span> 敌对</span>
-          <span>— 实线:强关系 虚线:弱关系</span>
-        </div>
-        <div class="causal-graph-container" id="causalGraph"></div>
-        <div class="btn-row" style="margin-top:4px">
-          <button class="btn-secondary btn-xs" onclick="loadCausalGraph('characters')">角色关系</button>
-          <button class="btn-secondary btn-xs" onclick="loadCausalGraph('events')">事件因果</button>
-          <button class="btn-secondary btn-xs" onclick="loadCausalGraph('timeline')">时间线</button>
-        </div>
-        <div class="event-timeline" id="causalTimeline" style="display:none"></div>
-      </div>
+    <!-- Tab bar -->
+    <div class="inspire-tabs" style="display:flex;gap:2px;margin-bottom:6px;border-bottom:1px solid var(--border);padding-bottom:4px">
+      <button class="tab-btn active" onclick="switchInspireTab('tools')" id="tabTools" style="flex:1;font-size:11px;padding:4px 2px">&#9997;&#65039; 写作</button>
+      <button class="tab-btn" onclick="switchInspireTab('pov')" id="tabPOV" style="flex:1;font-size:11px;padding:4px 2px">&#128065;&#65039; 视角</button>
+      <button class="tab-btn" onclick="switchInspireTab('quality')" id="tabQuality" style="flex:1;font-size:11px;padding:4px 2px">&#128269; 检测</button>
+      <button class="tab-btn" onclick="switchInspireTab('causal')" id="tabCausal" style="flex:1;font-size:11px;padding:4px 2px">&#128376;&#65039; 因果</button>
     </div>
-    <!-- Module 1: 剧情推演器 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 剧情推演器
-      </div>
-      <div class="inspire-body">
-        <textarea id="propelInput" placeholder="输入当前剧情状态，如：主角刚在山洞里拿到秘籍，但洞口塌了，外面仇家正在搜山..."></textarea>
-        <div class="btn-row">
-          <button class="btn-primary btn-sm" onclick="generatePropels()">推演3条走向</button>
+
+    <!-- Tab: 写作 -->
+    <div id="tabContent-tools">
+      <div class="inspire-module">
+        <div class="inspire-header" onclick="toggleInspireModule(this)"><span class="arrow">&#9660;</span> 剧情推演器</div>
+        <div class="inspire-body">
+          <textarea id="propelInput" placeholder="输入当前场景..." style="width:100%;height:50px;font-size:12px;resize:vertical"></textarea>
+          <div class="btn-row"><button class="btn-primary btn-sm btn-block" onclick="runPropel()">推演3条走向</button></div>
+          <div class="output-box" id="propelOutput" style="margin-top:4px;max-height:200px;overflow-y:auto;font-size:12px;line-height:1.6"></div>
         </div>
-        <div class="output-box" id="propelOutput"></div>
       </div>
-    </div>
-    <!-- Module 2: 视角切换器 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 视角切换器
-      </div>
-      <div class="inspire-body">
-        <select id="povSwitcher" style="width:100%;margin-bottom:6px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px">
-          <option value="sidekick">配角迪化 — 小弟脑补主角深不可测</option>
-          <option value="villain">反派视角 — 反派策划阴谋，烘托危机</option>
-          <option value="bystander">旁观者 — 路人见证主角造成的轰动</option>
-          <option value="neutral">中间派 — 摇摆角色的立场变化</option>
-        </select>
-        <textarea id="povInput" placeholder="粘贴一段正文，AI用选定视角重写..."></textarea>
-        <div class="btn-row">
-          <button class="btn-primary btn-sm" onclick="generatePOV()">切换视角重写</button>
+      <div class="inspire-module">
+        <div class="inspire-header" onclick="toggleInspireModule(this)"><span class="arrow">&#9660;</span> 钩子工坊</div>
+        <div class="inspire-body">
+          <div class="btn-row" style="flex-wrap:wrap;gap:4px">
+            <button class="btn-secondary btn-sm" onclick="generateHook('action_预告')">行动预告</button>
+            <button class="btn-secondary btn-sm" onclick="generateHook('suspense')">悬念型</button>
+            <button class="btn-secondary btn-sm" onclick="generateHook('reversal_预告')">反转预告</button>
+            <button class="btn-secondary btn-sm" onclick="generateHook('smart')">智能</button>
+          </div>
+          <div class="output-box" id="hookOutput" style="margin-top:4px;max-height:150px;overflow-y:auto;font-size:12px;line-height:1.6"></div>
         </div>
-        <div class="output-box" id="povOutput"></div>
       </div>
-    </div>
-    <!-- Module 3: 冲突注入器 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 冲突注入器
-      </div>
-      <div class="inspire-body">
-        <div class="btn-row" style="flex-wrap:wrap">
-          <button class="btn-secondary btn-sm" onclick="injectConflict('secret')">曝光秘密</button>
-          <button class="btn-secondary btn-sm" onclick="injectConflict('enemy')">引入新敌</button>
-          <button class="btn-secondary btn-sm" onclick="injectConflict('crisis')">限时危机</button>
-          <button class="btn-secondary btn-sm" onclick="injectConflict('betray')">盟友反水</button>
-        </div>
-        <div class="output-box" id="conflictOutput" style="margin-top:6px"></div>
-      </div>
-    </div>
-    <!-- Module 4: 钩子工坊（上下文感知） -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 钩子工坊
-      </div>
-      <div class="inspire-body">
-        <div class="btn-row">
-          <button class="btn-secondary btn-sm" onclick="generateHook('action')">行动预告型</button>
-          <button class="btn-secondary btn-sm" onclick="generateHook('suspense')">悬念型</button>
-          <button class="btn-secondary btn-sm" onclick="generateHook('twist')">反转预告型</button>
-          <button class="btn-primary btn-sm" onclick="generateHook('auto')" style="margin-left:4px">智能生成</button>
-        </div>
-        <div class="output-box" id="hookOutput"></div>
-      </div>
-    </div>
-    <!-- Module 5: 剧情翻新器 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 剧情翻新器
-      </div>
-      <div class="inspire-body">
-        <textarea id="flipInput" placeholder="输入一个经典剧情模式，如：英雄救美后被拖下水..."></textarea>
-        <div class="btn-row">
-          <button class="btn-primary btn-sm" onclick="generateFlip()">翻转翻新</button>
-        </div>
-        <div class="output-box" id="flipOutput"></div>
-      </div>
-    </div>
-    <!-- Module 6: 过审检测 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 过审检测
-      </div>
-      <div class="inspire-body">
-        <div class="btn-row" style="flex-wrap:wrap;gap:4px">
-          <button class="btn-primary btn-sm" onclick="runComplianceCheck()">全面检测</button>
-          <button class="btn-secondary btn-sm" onclick="runLexicalAudit()">仅词法</button>
-          <button class="btn-secondary btn-sm" onclick="runAIRepetitionCheck()">高频复用</button>
-        </div>
-        <div class="output-box" id="complianceOutput" style="margin-top:6px;max-height:300px;overflow-y:auto"></div>
-      </div>
-    </div>
-    <!-- Module 7: 质量仪表 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 质量仪表
-      </div>
-      <div class="inspire-body">
-        <div class="gate-display" id="qualityGateDisplay">
-          <div class="score" id="qgScore">--</div>
-          <div class="detail" id="qgDetail">加载中...</div>
-        </div>
-        <div class="btn-row">
-          <button class="btn-primary btn-sm btn-block" onclick="loadQualityGate()">刷新评分</button>
+      <div class="inspire-module">
+        <div class="inspire-header" onclick="toggleInspireModule(this)"><span class="arrow">&#9660;</span> 剧情翻新</div>
+        <div class="inspire-body">
+          <textarea id="flipInput" placeholder="输入想要翻新的剧情段落..." style="width:100%;height:40px;font-size:12px;resize:vertical"></textarea>
+          <div class="btn-row"><button class="btn-primary btn-sm btn-block" onclick="runPlotFlip()">翻新</button></div>
+          <div class="output-box" id="flipOutput" style="margin-top:4px;max-height:150px;overflow-y:auto;font-size:12px;line-height:1.6"></div>
         </div>
       </div>
     </div>
-    <!-- Module 7: AI对话 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> AI对话
+
+    <!-- Tab: 视角 -->
+    <div id="tabContent-pov" style="display:none">
+      <div class="inspire-module">
+        <div class="inspire-header" onclick="toggleInspireModule(this)"><span class="arrow">&#9660;</span> 视角切换</div>
+        <div class="inspire-body">
+          <select id="povSwitcher" style="width:100%;font-size:12px;margin-bottom:4px">
+            <option value="配角迪化">配角迪化 — 小弟脑补主角深不可测</option>
+            <option value="反派视角">反派视角 — 反派策划阴谋烘托危机</option>
+            <option value="旁观者">旁观者 — 路人见证主角造成的轰动</option>
+            <option value="中间派">中间派 — 摇摆角色的立场变化</option>
+          </select>
+          <textarea id="povInput" placeholder="输入需要切换视角的场景..." style="width:100%;height:40px;font-size:12px;resize:vertical"></textarea>
+          <div class="btn-row"><button class="btn-primary btn-sm btn-block" onclick="runPOVSwitch()">切换视角重写</button></div>
+          <div class="output-box" id="povOutput" style="margin-top:4px;max-height:150px;overflow-y:auto;font-size:12px;line-height:1.6"></div>
+        </div>
       </div>
-      <div class="inspire-body">
-        <div class="chat-messages" id="inspireChatMsgs"></div>
-        <div class="chat-input-row">
-          <input type="text" id="inspireChatInput" placeholder="和AI讨论你的故事..." onkeydown="if(event.key==='Enter')inspireChatSend()">
-          <button class="btn-primary btn-sm" onclick="inspireChatSend()">发送</button>
+      <div class="inspire-module">
+        <div class="inspire-header" onclick="toggleInspireModule(this)"><span class="arrow">&#9660;</span> 冲突注入</div>
+        <div class="inspire-body">
+          <div class="btn-row" style="flex-wrap:wrap;gap:4px">
+            <button class="btn-secondary btn-sm" onclick="injectConflict('expose_secret')">曝光秘密</button>
+            <button class="btn-secondary btn-sm" onclick="injectConflict('new_enemy')">引入新敌</button>
+            <button class="btn-secondary btn-sm" onclick="injectConflict('time_crisis')">限时危机</button>
+            <button class="btn-secondary btn-sm" onclick="injectConflict('ally_betray')">盟友反水</button>
+          </div>
+          <div class="output-box" id="conflictOutput" style="margin-top:4px;max-height:150px;overflow-y:auto;font-size:12px;line-height:1.6"></div>
+        </div>
+      </div>
+      <div class="inspire-module">
+        <div class="inspire-header" onclick="toggleInspireModule(this)"><span class="arrow">&#9660;</span> AI对话</div>
+        <div class="inspire-body">
+          <div class="chat-messages" id="inspireChatMsgs" style="max-height:120px;overflow-y:auto"></div>
+          <div class="chat-input-row">
+            <input type="text" id="inspireChatInput" placeholder="和AI讨论你的故事..." onkeydown="if(event.key==='Enter')inspireChatSend()">
+            <button class="btn-primary btn-sm" onclick="inspireChatSend()">发送</button>
+          </div>
         </div>
       </div>
     </div>
-    <!-- Module 8: 章节诊断 -->
-    <div class="inspire-module">
-      <div class="inspire-header" onclick="toggleInspireModule(this)">
-        <span class="arrow">&#9660;</span> 章节诊断
-      </div>
-      <div class="inspire-body">
-        <div class="btn-row">
-          <button class="btn-primary btn-sm btn-block" onclick="runChapterAnalysis()">分析当前章节</button>
+
+    <!-- Tab: 检测 -->
+    <div id="tabContent-quality" style="display:none">
+      <div class="inspire-module">
+        <div class="inspire-header" onclick="toggleInspireModule(this)"><span class="arrow">&#9660;</span> 章节诊断</div>
+        <div class="inspire-body">
+          <div class="btn-row"><button class="btn-primary btn-sm btn-block" onclick="runChapterAnalysis()">分析当前章节</button></div>
+          <div class="output-box" id="analysisOutput" style="margin-top:4px;max-height:200px;overflow-y:auto;font-size:12px;line-height:1.6"></div>
         </div>
-        <div class="output-box" id="analysisOutput" style="margin-top:6px;max-height:400px;overflow-y:auto;font-size:12px;line-height:1.6"></div>
       </div>
+      <div class="inspire-module">
+        <div class="inspire-header" onclick="toggleInspireModule(this)"><span class="arrow">&#9660;</span> 过审检测</div>
+        <div class="inspire-body">
+          <div class="btn-row" style="flex-wrap:wrap;gap:4px">
+            <button class="btn-primary btn-sm" onclick="runComplianceCheck()">全面检测</button>
+            <button class="btn-secondary btn-sm" onclick="runLexicalAudit()">仅词法</button>
+            <button class="btn-secondary btn-sm" onclick="runAIRepetitionCheck()">高频复用</button>
+          </div>
+          <div class="output-box" id="complianceOutput" style="margin-top:4px;max-height:200px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div class="inspire-module">
+        <div class="inspire-header" onclick="toggleInspireModule(this)"><span class="arrow">&#9660;</span> 质量仪表</div>
+        <div class="inspire-body">
+          <div class="gate-display" id="qualityGateDisplay">
+            <div class="score" id="qgScore">--分</div>
+            <div class="detail" id="qgDetail">无详细信息</div>
+          </div>
+          <div class="btn-row"><button class="btn-primary btn-sm btn-block" onclick="loadQualityGate()">刷新评分</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: 因果图 -->
+    <div id="tabContent-causal" style="display:none">
+      <div class="causal-legend" style="margin-bottom:4px;display:flex;align-items:center">
+        <span style="font-size:10px"><span style="background:var(--accent);width:6px;height:6px;display:inline-block;border-radius:50%"></span> 主角</span>
+        <span style="font-size:10px;margin-left:8px"><span style="background:var(--text3);width:6px;height:6px;display:inline-block;border-radius:50%"></span> 配角</span>
+        <span style="font-size:10px;margin-left:8px"><span style="background:var(--danger);width:6px;height:6px;display:inline-block;border-radius:50%"></span> 敌对</span>
+        <span style="font-size:10px;margin-left:8px;color:var(--text3)">实线强·虚线弱</span>
+        <span id="causalBadge" style="font-size:10px;color:var(--text2);margin-left:auto"></span>
+      </div>
+      <div class="causal-graph-container" id="causalGraph" style="height:260px"></div>
+      <div class="btn-row" style="margin-top:4px;gap:4px">
+        <button class="btn-secondary btn-xs" onclick="loadCausalGraph('characters')">角色关系</button>
+        <button class="btn-secondary btn-xs" onclick="loadCausalGraph('events')">事件因果</button>
+        <button class="btn-secondary btn-xs" onclick="loadCausalGraph('timeline')">时间线</button>
+      </div>
+      <div class="event-timeline" id="causalTimeline" style="display:none;max-height:260px"></div>
     </div>
   </div>
 </div>
 
-</div> <!-- /layout -->
 
 <!-- Toast container -->
 <div class="toast-container" id="toastContainer"></div>
@@ -1427,6 +1408,18 @@ function toggleTheme() {
 })();
 
 // ── toggleInspireModule ──
+function switchInspireTab(tab) {
+  // Update tab button styles
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  var btn = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+  if (btn) btn.classList.add('active');
+  // Show/hide tab contents
+  ['tools','pov','quality','causal'].forEach(function(t){
+    var el = document.getElementById('tabContent-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+}
+
 function toggleInspireModule(headerEl) {
   if (!headerEl) return;
   headerEl.classList.toggle('collapsed');
