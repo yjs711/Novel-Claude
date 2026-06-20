@@ -11,6 +11,12 @@
   "emotion_awe": "emotions/awe-wonder",
   "emotion_despair": "emotions/despair-breakdown",
   "emotion_tension": "emotions/tension-anxiety",
+  "pov_first": "pov/first-person",
+  "pov_third": "pov/third-limited",
+  "pov_multi": "pov/multi-switching",
+  "pacing_fast": "pacing/fast-action",
+  "pacing_slow": "pacing/slow-tension",
+  "pacing_release": "pacing/release-resolution"
   "scene_battle": "scene-battle-action",
   "scene_romance": "scene-romance",
   "scene_horror": "scene-horror",
