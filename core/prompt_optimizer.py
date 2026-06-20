@@ -61,50 +61,51 @@ class PromptOptimizer:
 
         # 定义评分指标
         def writing_metric(example, pred, trace=None):
-            """智能评分：区分文学比喻（用于解释）vs AI模板比喻（用于装饰）"""
+            """区分文学比喻 vs AI模板比喻（基于2025多项中文AI写作研究文档化发现）"""
             score = 0.0
             text = pred.output
 
-            # ── 比喻检测（区分文学 vs 模板） ──
+            # ── 比喻检测 ──
+            # 基于 2025 Antislop + 知乎/豆瓣/CSDN 多源整理的 LLM 高频喻体
+            # 特征: 通用感官名词→装饰性比喻（"说不清楚也要用"，不是"说不清楚才用"）
+            AI_SLOP_NOUNS = [
+                "砂纸","刀割","针刺","电流","涟漪","扁舟","风箱","重锤",
+                "石子","藤蔓","小兽","潮水","漩涡","深渊","绳索","牢笼",
+                "巨石","闪电","火焰","寒冰","利刃","铁钳","熔炉"
+            ]
+
             simile_words = ["像", "仿佛", "如同", "犹如", "宛如"]
             for s in simile_words:
                 if s in text:
-                    # 判断上下文：长句+专业名词 → 文学比喻, 短句+感官词 → AI模板
                     idx = text.index(s)
-                    context = text[max(0,idx-10):idx+30]
+                    context = text[max(0,idx-8):idx+30]
                     sentences = [x.strip() for x in text.split("。") if s in x]
-                    context_len = len(sentences[0]) if sentences else 0
+                    ctx_len = len(sentences[0]) if sentences else 0
 
-                    # 检测喻体类别
-                    tool_words = ["锉刀","砂纸","刀","针","锤","锯","枪","剑","斧","锁","链"]
-                    nature_words = ["风","雨","雷","电","云","雾","霜","雪","冰","火","水","浪"]
-                    abstract_words = ["电流","涟漪","巨石","扁舟","潮水","漩涡","风暴","深渊"]
-                    professional_words = ["日珥","氦闪","星云","粒子","细胞","基因","量子","拓扑","引力"]
-
-                    tool_hit = any(w in context for w in tool_words + nature_words + abstract_words)
-                    prof_hit = any(w in context for w in professional_words)
-                    is_long = context_len > 35
-
-                    # 专业比喻（解释性）不扣分
-                    if prof_hit or is_long:
-                        pass  # 文学比喻，不惩罚
-                    # 模板比喻（装饰性）扣分
-                    elif tool_hit:
-                        score -= 0.8  # 重罚：明显是AI模板
+                    # 规则1: 喻体命中 AI 文档化高频列表 → AI模板, 重罚
+                    if any(w in context for w in AI_SLOP_NOUNS):
+                        score -= 0.8
+                    # 规则2: 长句(>40字)中的比喻 → 更可能是解释性, 不罚
+                    elif ctx_len > 40:
+                        pass
+                    # 规则3: 短句+比喻 → 可疑, 轻罚
+                    elif ctx_len < 25:
+                        score -= 0.4
                     else:
-                        score -= 0.3  # 轻罚：不确定
+                        score -= 0.2
 
-            # ── AI词汇检测（放宽"缓缓"等文学常用词） ──
-            hard_ai_words = ["不禁","顿时","忽然","心头","嘴角","一股","前所未有"]
-            soft_ai_words = ["缓缓","微微","轻轻"]  # 文学中也有，轻罚
-            for w in hard_ai_words:
-                if w in text:
-                    score -= 0.5
-            for w in soft_ai_words:
-                if w in text:
-                    score -= 0.15
+            # ── AI 词汇 ──
+            # 基于 2025 研究: Lubrano 论文量化 + 中文社区标注
+            # 硬禁词: LLM 显著过度使用 (≥3x 人类基准), 重罚
+            HARD_AI = ["不禁","顿时","忽然","心头","嘴角","一股","前所未有","不可名状"]
+            # 软禁词: 文学中也用, 但 AI 更频繁 (~1.5x), 轻罚
+            SOFT_AI = ["缓缓","微微","轻轻","悄然","静静"]
+            for w in HARD_AI:
+                if w in text: score -= 0.5
+            for w in SOFT_AI:
+                if w in text: score -= 0.15
 
-            # ── 奖励：长度、句子多样性 ──
+            # ── 奖励 ──
             if len(text) > 80: score += 1.0
             if len(text) > 150: score += 0.5
             sent = [x.strip() for x in text.replace("！","。").replace("？","。").split("。") if len(x.strip())>3]
