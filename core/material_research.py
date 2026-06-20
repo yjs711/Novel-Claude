@@ -94,14 +94,23 @@ class MaterialResearcher:
         lib_dir = Path(__file__).resolve().parent.parent / "prompts" / "material-library"
         if not lib_dir.exists():
             return None
-        # 题材→库映射
-        mapping = {
-            "修仙": ["01-economy.md","02-food.md","03-clothing.md","04-official.md","05-folklore.md","06-military.md","07-housing.md"],
-            "仙侠": ["01-economy.md","02-food.md","03-clothing.md","04-official.md","05-folklore.md","06-military.md"],
-            "武侠": ["01-economy.md","03-clothing.md","04-official.md","06-military.md"],
-            "历史": ["01-economy.md","02-food.md","03-clothing.md","04-official.md","05-folklore.md","06-military.md","07-housing.md"],
-            "都市": ["01-economy.md","02-food.md","07-housing.md"],
+        # 题材→库目录映射
+        genre_dirs = {
+            "修仙": "ancient", "仙侠": "ancient", "武侠": "ancient", "历史": "ancient",
+            "玄幻": "ancient",
+            "科幻": "scifi", "赛博": "scifi", "星际": "scifi", "末世": "scifi",
+            "都市": "modern", "校园": "modern", "重生": "modern", "系统流": "modern",
         }
+        subdir = genre_dirs.get(genre)
+        if not subdir:
+            return None
+        lib_dir = Path(__file__).resolve().parent.parent / "prompts" / "material-library" / subdir
+        if not lib_dir.exists():
+            return None
+        parts = []
+        for fp in sorted(lib_dir.glob("*.md")):
+            parts.append(fp.read_text(encoding="utf-8"))
+        return "\n\n---\n\n".join(parts) if parts else None
         files = mapping.get(genre)
         if not files:
             return None
