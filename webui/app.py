@@ -1792,6 +1792,7 @@ async def deai_rewrite(request: Request):
     user_prompt = data.get("prompt", "")
     if not full_text:
         return {"error": "content required"}
+    cfg = load_cfg()
 
     # Run detection first
     import sys
