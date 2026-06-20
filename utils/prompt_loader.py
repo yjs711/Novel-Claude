@@ -106,30 +106,44 @@ def list_styles() -> list[str]:
 	return [p.stem for p in _STYLE_DIR.glob("*.md")]
 
 
-def inject_style_reference(base_prompt: str, style: str, genre: str = "", scene: str = "") -> str:
+def load_emotion_reference(emotion: str) -> str | None:
+	"""加载指定情感的参照文本。"""
+	ref_key = _get_style_map().get(f"emotion_{emotion}")
+	if ref_key:
+		return load_style_reference(ref_key)
+	return None
+
+
+def inject_style_reference(base_prompt: str, style: str = "", genre: str = "",
+                           scene: str = "", emotion: str = "") -> str:
 	"""
-	将匹配的风格参照 + 场景参照注入到提示词末尾。
-	scene: 可选场景类型 (battle/romance/horror/triumph/breakthrough/dialogue)
+	三轴参照注入: 风格 + 场景 + 情感。
+	emotion: sorrow/anger/fear/joy/love/loneliness/warmth/humor/awe/despair/tension
 	"""
 	parts = []
 
 	# 风格参照
-	ref = match_style_reference(style, genre)
-	if ref:
-		disclaimer = (
-			"---\n"
-			"**风格参照（学习节奏/句式/留白，注意以下规则）：**\n"
-			"- 不抄袭文中比喻（作者用天体物理/武学/医学等专业词汇做喻体是因为领域知识，AI没有这个资本）\n"
-			"- 学习的是\"怎么推进叙事\"，不是\"怎么堆比喻\"\n"
-			"- 如果写比喻：问自己\"删掉它读者还理解吗\"——能则删，不能则留\n\n"
-		)
-		parts.append(disclaimer + ref)
+	if style:
+		ref = match_style_reference(style, genre)
+		if ref:
+			disclaimer = (
+				"---\n"
+				"**风格参照（学习节奏/句式/留白）：**\n"
+				"- 不抄袭比喻，学习的是\"怎么推进叙事\"\n\n"
+			)
+			parts.append(disclaimer + ref)
 
 	# 场景参照
 	if scene:
 		scene_ref = load_style_reference(f"scene-{scene}")
 		if scene_ref:
-			parts.append(f"\n\n---\n**场景参照（{scene}场景写作范本）：**\n\n" + scene_ref)
+			parts.append(f"\n\n---\n**场景参照（{scene}写作范本）：**\n\n" + scene_ref)
+
+	# 情感参照
+	if emotion:
+		emo_ref = load_emotion_reference(emotion)
+		if emo_ref:
+			parts.append(f"\n\n---\n**情感参照（{emotion}的表达技法）：**\n\n" + emo_ref)
 
 	if parts:
 		return base_prompt + "\n\n" + "\n".join(parts)
