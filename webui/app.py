@@ -489,8 +489,9 @@ async def write_stream(request: Request):
             pres_pen = _llm_presence_penalty("writing")
             top_p = _llm_top_p("writing")
 
-            from utils.prompt_loader import writing_prompt
+            from utils.prompt_loader import writing_prompt, inject_style_reference
             system_prompt = writing_prompt() + _build_genre_style_injection(cfg)
+            system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""))
             # 用 Queue 在线程和事件循环之间传递 token
             token_queue: asyncio.Queue = asyncio.Queue()
 
@@ -1697,7 +1698,7 @@ async def deai_rewrite(request: Request):
     client = get_task_client("writing")
     model = get_task_model("writing")
 
-    from utils.prompt_loader import polishing_prompt
+    from utils.prompt_loader import polishing_prompt, inject_style_reference
 
     # ── 根据是否有用户 prompt 决定主任务 ──
     if user_prompt:
@@ -1744,6 +1745,8 @@ async def deai_rewrite(request: Request):
 5. 对话必须有意推进，每轮承载事实/规矩/代价之一
 6. 情绪不直说，用动作和环境呈现
 7. 保持原文剧情走向，直接输出改写后的完整正文"""
+
+    system_prompt = inject_style_reference(system_prompt, cfg.get("style", ""), cfg.get("genre", ""))
 
     async def generate():
         try:

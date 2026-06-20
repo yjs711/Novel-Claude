@@ -1,0 +1,23 @@
+{
+  "金庸武侠": "wuxia-traditional",
+  "古龙风格": "wuxia-minimalist",
+  "网文爽文": "webnovel-power-fantasy",
+  "热血燃向": "webnovel-power-fantasy",
+  "暗黑压抑": "dark-atmospheric",
+  "暗黑哥特": "dark-atmospheric",
+  "幽默吐槽": "humor-voicey",
+  "黑色幽默": "humor-voicey",
+  "纯文学": "literary-realist",
+  "文艺唯美": "literary-realist",
+  "白描纪实": "literary-realist",
+  "硬汉冷峻": "hardboiled-minimal",
+  "现代极简": "hardboiled-minimal",
+  "硬核科幻": "hardboiled-minimal",
+  "第一人称口语化": "first-person-voice",
+  "多视角切换": "first-person-voice",
+  "说书风": "wuxia-traditional",
+  "剧本风": "first-person-voice",
+  "意识流": "literary-realist",
+  "轻小说": "humor-voicey",
+  "热血燃向_alt": "webnovel-power-fantasy"
+}

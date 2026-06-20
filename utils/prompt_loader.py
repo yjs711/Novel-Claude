@@ -30,7 +30,21 @@ MODEL_PROMPT_MAP = {
 	"qwen3.6-uncensored-aggressive":  "brainstorm-35b-aggressive.md",
 }
 
+_MAPPING_FILE = Path(__file__).resolve().parent.parent / "prompts" / "style_mapping.json"
 _cache: dict[str, str] = {}
+_style_map: dict[str, str] | None = None
+
+def _get_style_map() -> dict[str, str]:
+	"""加载风格→参照文件的映射表。"""
+	global _style_map
+	if _style_map is None:
+		import json
+		if _MAPPING_FILE.exists():
+			_style_map = json.loads(_MAPPING_FILE.read_text(encoding="utf-8"))
+		else:
+			_style_map = {}
+	# 过滤掉 _alt 后缀的条目
+	return {k: v for k, v in _style_map.items() if not k.endswith("_alt")}
 
 def load_prompt(task_or_model: str) -> str:
 	"""
@@ -68,9 +82,39 @@ def load_style_reference(style_name: str) -> str | None:
 	return None
 
 
+def match_style_reference(style: str, genre: str = "") -> str | None:
+	"""
+	根据用户选定的风格和流派，自动匹配对应的参照文本。
+
+	优先级：精确匹配 style_mapping → 模糊匹配 → None
+	"""
+	mapping = _get_style_map()
+	ref_key = mapping.get(style)
+	if ref_key:
+		ref = load_style_reference(ref_key)
+		if ref:
+			# 可选的流派前缀
+			genre_ref = load_style_reference(f"{ref_key}-{genre}")
+			if genre_ref:
+				ref = ref + "\n\n" + genre_ref
+			return ref
+	return None
+
+
 def list_styles() -> list[str]:
 	"""列出所有可用的风格参照。"""
 	return [p.stem for p in _STYLE_DIR.glob("*.md")]
+
+
+def inject_style_reference(base_prompt: str, style: str, genre: str = "") -> str:
+	"""
+	将匹配的风格参照注入到提示词末尾。
+	返回 base_prompt + 风格参照（如果有匹配）。
+	"""
+	ref = match_style_reference(style, genre)
+	if ref:
+		return base_prompt + "\n\n---\n**风格参照（以下为人类写作范本，请学习其节奏和手法，但不要直接抄袭内容）：**\n\n" + ref
+	return base_prompt
 
 
 def _default_prompt() -> str:
