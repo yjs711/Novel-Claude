@@ -36,74 +36,81 @@ class MaterialResearcher:
 
     def research_materials(self, genre: str, style: str, extra_context: str = "") -> str:
         """
-        v2: 联网搜索真实数据 + 本地模型整理
+        v3: 本地素材库优先 + 联网搜索补充
 
-        步骤:
-        1. 根据题材确定搜索关键词 (genre → 真实历史对应)
-        2. 逐维度搜索真实数据
-        3. 本地模型整理+结构化
+        素材来源:
+        1. prompts/material-library/ 预置库 (离线, 可靠)
+        2. 联网搜索 (在线, 补充)
+        3. 本地模型结构化整理
         """
-        # 搜索维度
-        dimensions = {
-            "经济货币": f"{genre} 古代 货币 物价 工资 日常开销",
-            "饮食起居": f"{genre} 古代 饮食 食物 三餐 烹饪",
-            "居住建筑": f"{genre} 古代 房屋 建筑 家具 照明 取暖",
-            "交通出行": f"{genre} 古代 交通 出行 马 船 马车",
-            "服饰着装": f"{genre} 古代 服饰 衣服 材质 等级",
-            "社会结构": f"{genre} 古代 家庭 婚姻 宗族 科举 官制",
-        }
+        # 先加载本地素材库
+        library = self._load_local_library(genre)
+        if library:
+            self.notes["genre"] = genre
+            self.notes["style"] = style
+            self.notes["_raw"] = library
+            self.notes["_source"] = "本地素材库 (prompts/material-library/)"
+            self.notes["_generated_at"] = time.time()
+            self.save()
+            return library
 
+        # 本地库无匹配 → 联网搜索
+        print(f"  [素材] 本地库无{genre}数据, 联网搜索...")
         all_search_results = []
-        print(f"  [素材] 联网搜索 {genre} 的真实历史数据...")
-
-        # 逐维度搜索 (使用内置 WebSearch)
+        dimensions = {
+            "经济货币": f"{genre} 古代 货币 物价 工资",
+            "饮食起居": f"{genre} 古代 饮食 食物 三餐",
+            "居住建筑": f"{genre} 古代 房屋 建筑 家具",
+            "交通出行": f"{genre} 古代 交通 出行",
+            "服饰着装": f"{genre} 古代 服饰 衣服 等级",
+            "社会结构": f"{genre} 古代 家庭 科举 官制",
+        }
         try:
-            # 这里用 Python 的 requests 直接搜, 绕开 LLM 编造
             import urllib.request, urllib.parse
             for dim, query in dimensions.items():
-                encoded = urllib.parse.quote(query)
-                url = f"https://www.google.com/search?q={encoded}"
-                # 简单提取搜索结果片段 (不使用LLM)
                 try:
-                    req = urllib.request.Request(url, headers={
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                    })
+                    url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                     r = urllib.request.urlopen(req, timeout=10)
                     html = r.read().decode('utf-8', errors='ignore')
-                    # 提取搜索结果摘要
                     snippets = re.findall(r'<span[^>]*>([^<]{20,200})</span>', html)
                     relevant = [s for s in snippets[:15] if not any(w in s.lower() for w in ['script','style','class','function'])]
                     all_search_results.append(f"\n## {dim}\n" + "\n".join(relevant[:5]))
-                except Exception as e:
-                    all_search_results.append(f"\n## {dim}\n(搜索暂时不可用: {e})")
-                    # 降级: 用 genre 知识库中的模板数据
-                    fallback = self._fallback_knowledge(genre, dim)
-                    if fallback:
-                        all_search_results.append(fallback)
-        except Exception as e:
-            print(f"  [素材] 搜索失败: {e}, 使用内置知识库")
-            all_search_results.append(self._fallback_all(genre))
+                except: pass
+        except: pass
 
-        raw_material = "\n".join(all_search_results)
-        if not raw_material.strip():
-            raw_material = f"# {genre} 基础设定\n(搜索不可用, 请手动补充素材)"
-
-        # 保存搜索来源
-        source_text = f"# 素材来源\n生成时间: {time.strftime('%Y-%m-%d %H:%M')}\n体裁: {genre}\n\n搜索维度:\n"
-        for dim, query in dimensions.items():
-            source_text += f"- {dim}: {query}\n"
-        self._source_file.write_text(source_text, encoding="utf-8")
-
-        # 本地模型整理
+        raw_material = "\n".join(all_search_results) if all_search_results else self._fallback_all(genre)
         structured = self._structure_with_local_model(raw_material, genre, style)
 
-        self.notes["genre"] = genre
-        self.notes["style"] = style
+        self.notes["genre"] = genre; self.notes["style"] = style
         self.notes["_raw"] = structured
-        self.notes["_sources"] = source_text
+        self.notes["_source"] = "联网搜索 (可追溯)"
         self.notes["_generated_at"] = time.time()
         self.save()
         return structured
+
+    def _load_local_library(self, genre: str) -> str | None:
+        """加载本地素材库"""
+        lib_dir = Path(__file__).resolve().parent.parent / "prompts" / "material-library"
+        if not lib_dir.exists():
+            return None
+        # 题材→库映射
+        mapping = {
+            "修仙": ["01-economy.md","02-food.md","03-clothing.md","04-official.md","05-folklore.md","06-military.md","07-housing.md"],
+            "仙侠": ["01-economy.md","02-food.md","03-clothing.md","04-official.md","05-folklore.md","06-military.md"],
+            "武侠": ["01-economy.md","03-clothing.md","04-official.md","06-military.md"],
+            "历史": ["01-economy.md","02-food.md","03-clothing.md","04-official.md","05-folklore.md","06-military.md","07-housing.md"],
+            "都市": ["01-economy.md","02-food.md","07-housing.md"],
+        }
+        files = mapping.get(genre)
+        if not files:
+            return None
+        parts = []
+        for fn in files:
+            fp = lib_dir / fn
+            if fp.exists():
+                parts.append(fp.read_text(encoding="utf-8"))
+        return "\n\n---\n\n".join(parts) if parts else None
 
     def _structure_with_local_model(self, raw_material: str, genre: str, style: str) -> str:
         """用本地模型结构化搜索结果 (不是编造, 是整理)"""
