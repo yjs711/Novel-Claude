@@ -1182,6 +1182,7 @@ def _default_outline(chapter_target=3000):
         "volumes": [
             {"number": 1, "name": "第一卷", "chapter_count": 200,
              "chapter_start": 1, "purpose": "",
+             "emotion_curve": ["绝望","愤怒","拼搏","喜悦"],  # 卷级情感弧线
              "chapters_list": [_empty_chapter(i, chapter_target) for i in range(1, 201)]},
         ]
     }
@@ -1191,7 +1192,10 @@ def _empty_chapter(num, target_words=3000):
         "number": num, "title": "", "pov": "", "status": "planned",
         "word_target": target_words, "summary": "",
         "scenes": [], "satisfaction_beat": "", "emotional_beat": "自动",
-        "emotion_curve": "", "ending_hook": "",
+        "emotion_curve": "",
+        "cycle": {"type": "", "acts": []},  # 微循环: 冲突升级/日常过渡/伏笔铺设/高潮释放
+        "foreshadowing": {"planted": [], "paid": []},
+        "ending_hook": "",
         "plot_advances": [], "character_moments": {}
     }
 
@@ -1210,6 +1214,8 @@ def _outline_to_markdown(outline):
         lines.append(f"## {vol.get('name', '')} ({vol.get('chapter_start', 1)}-{vol.get('chapter_start', 1) + vol.get('chapter_count', 0) - 1}章)")
         if vol.get("purpose"):
             lines.append(f"**目的**: {vol['purpose']}")
+        if vol.get("emotion_curve"):
+            lines.append(f"**情感弧线**: {' → '.join(vol['emotion_curve'])}")
         lines.append(f"**进度**: {done}/{vol.get('chapter_count', 0)}")
         lines.append("")
         lines.append("| 章 | 标题 | POV | 情感 | 概要 | 爽点 | 钩子 | 状态 |")
@@ -1318,6 +1324,10 @@ async def generate_chapter_outline(request: Request):
 
 ## 章末钩子
 [悬念/反转/期待——让读者必须点下一章]
+
+## 微循环标注
+每个场景标注循环类型: 冲突升级/日常过渡/伏笔铺设/高潮释放。
+确保每3章完成一个微循环(小爽点), 每10-15章完成一个中循环(篇章级完整故事)。
 
 ## 写作提示
 - 对话占40-60%
