@@ -1182,7 +1182,15 @@ def _default_outline(chapter_target=3000):
         "volumes": [
             {"number": 1, "name": "第一卷", "chapter_count": 200,
              "chapter_start": 1, "purpose": "",
-             "emotion_curve": ["绝望","愤怒","拼搏","喜悦"],  # 卷级情感弧线
+             "emotion_curve": ["绝望","愤怒","拼搏","喜悦"],
+             "arcs": [  # 弧线层: 10-15章一个完整剧情循环
+                 {"number": 1, "name": "废材之始", "chapter_range": [1, 15],
+                  "theme": "从天才到废材的落差与觉醒", "emotion_unit": "绝望",
+                  "cycle_type": "逆袭开端", "climax_chapter": 7},
+                 {"number": 2, "name": "三年之约", "chapter_range": [16, 30],
+                  "theme": "立誓变强", "emotion_unit": "愤怒",
+                  "cycle_type": "目标确立", "climax_chapter": 30},
+             ],
              "chapters_list": [_empty_chapter(i, chapter_target) for i in range(1, 201)]},
         ]
     }
@@ -1216,6 +1224,14 @@ def _outline_to_markdown(outline):
             lines.append(f"**目的**: {vol['purpose']}")
         if vol.get("emotion_curve"):
             lines.append(f"**情感弧线**: {' → '.join(vol['emotion_curve'])}")
+        if vol.get("arcs"):
+            lines.append("")
+            lines.append("| 弧 | 章节 | 主题 | 情感 | 类型 | 高潮章 |")
+            lines.append("|---|------|------|------|------|--------|")
+            for arc in vol["arcs"]:
+                cr = arc.get("chapter_range", [0,0])
+                lines.append(f"| {arc.get('name','')} | {cr[0]}-{cr[1]} | {arc.get('theme','')} | {arc.get('emotion_unit','')} | {arc.get('cycle_type','')} | ch{arc.get('climax_chapter',0)} |")
+            lines.append("")
         lines.append(f"**进度**: {done}/{vol.get('chapter_count', 0)}")
         lines.append("")
         lines.append("| 章 | 标题 | POV | 情感 | 概要 | 爽点 | 钩子 | 状态 |")
