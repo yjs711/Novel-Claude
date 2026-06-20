@@ -41,6 +41,17 @@ def save_cfg(cfg):
     with open(cfg_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
+def _build_character_context(novel_dir: str, chapter: int) -> str:
+    """注入角色状态上下文"""
+    try:
+        novel_path = Path(f".novel_{novel_dir}" if novel_dir else ".novel")
+        from core.character_state import CharacterStateManager
+        mgr = CharacterStateManager(novel_path)
+        return mgr.get_injection_context(chapter)
+    except Exception:
+        return ""
+
+
 def _build_audit_context(chapter: int) -> str:
     """加载上一章的审计结果（大纲回写循环）"""
     try:
@@ -560,6 +571,13 @@ async def write_stream(request: Request):
                                                    emotion=auto_emotion)
             system_prompt += _build_causal_context(chapter)
 
+            # 注入角色状态 (写前)
+            system_prompt += _build_character_context(novel_dir or "", chapter)
+
+            # 注入世界观设定 (写前)
+            from core.world_context import WorldContextInjector
+            system_prompt = WorldContextInjector.inject_context(system_prompt, novel_dir or "", prompt or "")
+
             # 注入上一章审计 (大纲回写循环, P2)
             if chapter > 1:
                 audit_ctx = _build_audit_context(chapter - 1)
@@ -640,6 +658,10 @@ async def write_stream(request: Request):
                         cfg_outline = load_cfg()
                         outline_data = {"volumes": cfg_outline.get("volumes", [])} if "volumes" in cfg_outline else {"volumes": []}
                         audit = mgr.audit_chapter(chapter, full_content, outline_data)
+                        # 同步更新角色状态
+                        from core.character_state import CharacterStateManager
+                        cmgr = CharacterStateManager(novel_path)
+                        cmgr.update_from_chapter(chapter, full_content)
                         return audit
                     except Exception:
                         return None
