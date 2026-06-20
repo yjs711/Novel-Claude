@@ -115,9 +115,10 @@ def inject_style_reference(base_prompt: str, style: str, genre: str = "") -> str
 	if ref:
 		disclaimer = (
 			"---\n"
-			"**风格参照（学习节奏/句式/留白，但以下内容严禁模仿）：**\n"
-			"- 不要学比喻结构（像/仿佛/如同/犹如）。真人用比喻是说不清楚才用，AI用比喻是装饰。\n"
-			"- 直接写感受，不要给感受找替身。\n\n"
+			"**风格参照（学习节奏/句式/留白，注意以下规则）：**\n"
+			"- 不抄袭文中比喻（作者用天体物理/武学/医学等专业词汇做喻体是因为领域知识，AI没有这个资本）\n"
+			"- 学习的是\"怎么推进叙事\"，不是\"怎么堆比喻\"\n"
+			"- 如果写比喻：问自己\"删掉它读者还理解吗\"——能则删，不能则留\n\n"
 		)
 		return base_prompt + "\n\n" + disclaimer + ref
 	return base_prompt

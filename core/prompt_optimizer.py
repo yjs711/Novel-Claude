@@ -61,31 +61,58 @@ class PromptOptimizer:
 
         # 定义评分指标
         def writing_metric(example, pred, trace=None):
-            """评分: 避免比喻+AI词汇，奖励长度和多样性"""
+            """智能评分：区分文学比喻（用于解释）vs AI模板比喻（用于装饰）"""
             score = 0.0
             text = pred.output
-            # 惩罚比喻
-            similes = ["像", "仿佛", "如同", "犹如", "宛如"]
-            for s in similes:
+
+            # ── 比喻检测（区分文学 vs 模板） ──
+            simile_words = ["像", "仿佛", "如同", "犹如", "宛如"]
+            for s in simile_words:
                 if s in text:
-                    score -= 0.5
-            # 惩罚AI词
-            ai_words = ["不禁", "缓缓", "微微", "顿时", "忽然", "心头", "嘴角"]
-            for w in ai_words:
+                    # 判断上下文：长句+专业名词 → 文学比喻, 短句+感官词 → AI模板
+                    idx = text.index(s)
+                    context = text[max(0,idx-10):idx+30]
+                    sentences = [x.strip() for x in text.split("。") if s in x]
+                    context_len = len(sentences[0]) if sentences else 0
+
+                    # 检测喻体类别
+                    tool_words = ["锉刀","砂纸","刀","针","锤","锯","枪","剑","斧","锁","链"]
+                    nature_words = ["风","雨","雷","电","云","雾","霜","雪","冰","火","水","浪"]
+                    abstract_words = ["电流","涟漪","巨石","扁舟","潮水","漩涡","风暴","深渊"]
+                    professional_words = ["日珥","氦闪","星云","粒子","细胞","基因","量子","拓扑","引力"]
+
+                    tool_hit = any(w in context for w in tool_words + nature_words + abstract_words)
+                    prof_hit = any(w in context for w in professional_words)
+                    is_long = context_len > 35
+
+                    # 专业比喻（解释性）不扣分
+                    if prof_hit or is_long:
+                        pass  # 文学比喻，不惩罚
+                    # 模板比喻（装饰性）扣分
+                    elif tool_hit:
+                        score -= 0.8  # 重罚：明显是AI模板
+                    else:
+                        score -= 0.3  # 轻罚：不确定
+
+            # ── AI词汇检测（放宽"缓缓"等文学常用词） ──
+            hard_ai_words = ["不禁","顿时","忽然","心头","嘴角","一股","前所未有"]
+            soft_ai_words = ["缓缓","微微","轻轻"]  # 文学中也有，轻罚
+            for w in hard_ai_words:
                 if w in text:
-                    score -= 0.3
-            # 奖励长度
-            if len(text) > 100:
-                score += 1.0
-            if len(text) > 200:
-                score += 0.5
-            # 奖励句子多样性
-            sentences = [s.strip() for s in text.replace("！", "。").replace("？", "。").split("。") if s.strip()]
-            if len(sentences) > 5:
-                avg_len = sum(len(s) for s in sentences) / len(sentences)
-                if 5 < avg_len < 40:
-                    score += 1.0
-            return max(0.0, score + 3.0)  # 基线 3 分
+                    score -= 0.5
+            for w in soft_ai_words:
+                if w in text:
+                    score -= 0.15
+
+            # ── 奖励：长度、句子多样性 ──
+            if len(text) > 80: score += 1.0
+            if len(text) > 150: score += 0.5
+            sent = [x.strip() for x in text.replace("！","。").replace("？","。").split("。") if len(x.strip())>3]
+            if len(sent) >= 3:
+                avg = sum(len(x) for x in sent) / len(sent)
+                if 8 < avg < 50: score += 1.0
+
+            return max(0.0, score + 1.0)
 
         # 构建模块
         module = dspy.ChainOfThought(WriterPrompt)
