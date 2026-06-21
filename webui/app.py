@@ -561,6 +561,12 @@ async def write_stream(request: Request):
 
             system_prompt = writing_prompt() + _build_genre_style_injection(cfg)
 
+            # 大纲上下文注入 system prompt（Zeng 2025: system 影响力弱→减少in-context污染）
+            from scene_writer import build_outline_context
+            outline_ctx = build_outline_context(volume, chapter)
+            if outline_ctx:
+                system_prompt += f"\n\n{outline_ctx}"
+
             # 自动检测大纲情感基调（零手动操作）
             auto_emotion = data.get("emotion", "")
             # 优先读取大纲中预设的情感标注

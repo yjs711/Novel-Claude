@@ -486,6 +486,26 @@ def _load_foreshadowing_context(chapter_id: int) -> str:
         return ""
 
 
+def build_outline_context(volume_id: int, chapter_id: int) -> str:
+    """提取章节大纲上下文，注入到 system prompt（而非 user prompt）。
+    基于 Zeng 2025: system prompt 对风格影响力弱，可减少 in-context 污染。
+    NovelForge 2025 设计原则: 结构化信息→system，真人示例→user。"""
+    outline = load_chapter_outline(volume_id, chapter_id)
+    if outline:
+        parts = ["【本章大纲】"]
+        parts.append(f"标题: {outline.get('title', f'第{chapter_id}章')}")
+        overview = outline.get("overview", "")
+        if overview:
+            parts.append(f"概要: {overview[:300]}")
+        emotional_beat = outline.get("emotional_beat", "")
+        if emotional_beat and emotional_beat != "自动":
+            parts.append(f"情绪基调: {emotional_beat}")
+        return "\n".join(parts)
+
+    # 回退：结构化要点
+    return _build_fallback_overview(volume_id, chapter_id)
+
+
 def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = None,
                          overview: str = None, entities: dict = None) -> str:
     """Build the full writing prompt for a chapter. Shared between CLI and WebUI.
@@ -518,7 +538,7 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
     prompt_parts = []
 
     # 1. Entity context (lightweight — who is in this scene)
-    prompt_parts.append(f"【本章大纲】\n{overview}\n")
+    # 大纲信息移到 system prompt（Zeng 2025: system prompt 对风格影响力弱，减少 in-context 污染）
     if entities:
         chars = entities.get('characters', [])
         if chars:
