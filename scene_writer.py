@@ -133,6 +133,87 @@ def load_entity_cards(entity_names: List[str]) -> Dict[str, List[dict]]:
     return result
 
 
+# ══════════════════════════════════════════════════════════════════════
+# 后处理模式检测器 — 基于 Antislop 2025 论文
+# 否定指令无法阻止 LLM 生成禁用模式（Semantic Gravity Wells 2025），
+# 因此需要在生成后进行正则扫描+标记，供用户手动修复或触发去AI味改写。
+# ══════════════════════════════════════════════════════════════════════
+
+# 禁用模式定义 — 每个模式带严重级别和正向改写建议
+BANNED_PATTERNS = [
+    # L1: AI解释性句式 (高优先级 — 直接暴露AI味)
+    ("AI解释", r"不是.{0,40}而是", "每句只陈述一个事实，不建立对比。改为两个独立的短句。"),
+    ("AI解释", r"不仅.{0,40}更是", "同上，改为两个独立短句。"),
+    ("AI解释", r"这(意味着|说明|表明|代表着|标志着)", "删掉'这X着'，让读者自己得出结论。"),
+    ("AI解释", r"(换句话说|也就是说|换言之|简而言之)", "删掉，前面已经说清楚了。"),
+    ("AI解释", r"似乎.{0,20}(了一般|似的|在诉说|在告诉)", "改为具体的感官描写。"),
+    ("AI解释", r"(仿佛|如同|宛如).{0,30}(在诉说|在告诉|在表达|在揭示)", "改为具体的声音/动作描写。"),
+    # L2: AI模板比喻
+    ("模板比喻", r"像.{0,20}(石子|涟漪|浆糊|流星|利剑|松树|火苗|扁舟|针扎|电流|耳光|婴儿|心跳|蜗牛|蝼蚁)", "用具体的物理感受替代比喻。"),
+    ("模板比喻", r"(如同|犹如|仿佛|宛如).{0,20}(石子|涟漪|浆糊|流星|利剑|松树|火苗|扁舟|针扎|电流|耳光|婴儿|心跳|蜗牛|蝼蚁)", "同上。"),
+    ("模板比喻", r"(空气|时间|世界|空间)(仿佛|似乎|好像).{0,20}(凝固|静止|停止|冻结)", "用具体的声音/动作描写替代。"),
+    # L3: AI高频词汇
+    ("AI高频词", r"(不禁|顿时|忽然|陡然)", "删掉副词，直接写动作。"),
+    ("AI高频词", r"一股.{0,20}(力量|气流|暖流|寒意|杀意|威压|波动)", "一股→具体的感官来源（如'丹田涌上的热流'→'丹田发热，像吞了块烧红的铁'）。"),
+    ("AI高频词", r"前所未有", "删掉，用具体对比替代。"),
+    ("AI高频词", r"不可名状", "用具体感官描写替代（视觉/触觉/声音）。"),
+    # L4: AI动作模板
+    ("AI动作", r"指节发白|攥紧衣角|咬紧下唇|眼眶泛红|心脏漏拍|脊背发凉|镀上金边", "用独特的个人习惯动作替代通用模板。"),
+    ("AI动作", r"命运的齿轮|这一切(刚刚开始|才刚开始|还远未结束)", "删掉，用具体情节推进替代口号。"),
+]
+
+
+def scan_banned_patterns(text: str) -> list[dict]:
+    """扫描文本中的禁用模式，返回标记列表。
+    每个标记包含: {pattern_type, severity(L1/L2/L3/L4), matched_text, position, suggestion}
+    """
+    import re
+    findings = []
+    seen_spans = set()  # 去重：同一位置不重复报
+
+    for idx, (ptype, regex, suggestion) in enumerate(BANNED_PATTERNS):
+        severity = f"L{min(idx // 4 + 1, 4)}"  # 前4个L1, 5-8 L2, 9-12 L3, 13+ L4
+        for m in re.finditer(regex, text):
+            start, end = m.start(), m.end()
+            # 检查是否与已有标记重叠
+            if any(start <= s_end and end >= s_start for s_start, s_end in seen_spans):
+                continue
+            seen_spans.add((start, end))
+            findings.append({
+                "type": ptype,
+                "severity": severity,
+                "matched": m.group()[:80],
+                "position": start,
+                "line": text[:start].count('\n') + 1,
+                "suggestion": suggestion,
+            })
+
+    findings.sort(key=lambda f: f["position"])
+    return findings
+
+
+def format_pattern_report(findings: list[dict]) -> str:
+    """格式化模式检测报告。"""
+    if not findings:
+        return ""
+
+    l1 = [f for f in findings if f["severity"] == "L1"]
+    l2 = [f for f in findings if f["severity"] == "L2"]
+    l3 = [f for f in findings if f["severity"] == "L3"]
+    l4 = [f for f in findings if f["severity"] == "L4"]
+
+    lines = ["\n\n---\n## 🤖 AI模式检测报告\n"]
+    lines.append(f"共发现 {len(findings)} 处AI写作模式 (L1解释: {len(l1)}, L2比喻: {len(l2)}, L3高频词: {len(l3)}, L4动作: {len(l4)})\n")
+
+    for f in findings[:20]:  # 最多显示20条
+        lines.append(f"- [{f['severity']}][{f['type']}] 第{f['line']}行: 「{f['matched']}」 → {f['suggestion']}")
+
+    if len(findings) > 20:
+        lines.append(f"\n... 还有 {len(findings) - 20} 处未列出")
+
+    return "\n".join(lines)
+
+
 def load_world_setting() -> dict:
     """Load world setting for context."""
     path = Path(SETTINGS_DIR) / "world_setting.json"
@@ -411,8 +492,8 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
     # 核心约束 — 放在 user prompt 而非 system prompt（27B 对用户指令遵从度更高）
     prompt_parts.append(
         "【写作要求】\n"
-        "1. 禁止「像/仿佛/如同/犹如/宛如」引导的明喻。全文最多用3个比喻，且只用于主角无法理解的超自然现象。用具体感官（触觉/温度/声音/气味）替代比喻。\n"
-        "2. 禁止套话比喻（石子/涟漪/浆糊/流星/利剑/松树/火苗/扁舟/针扎/电流/婴儿/心跳/凝固的空气/镀上金边/出鞘的剑），禁止两个比喻连用。\n"
+        "1. 每个场景用1个具体感官（触觉/温度/声音/气味）建立氛围，让读者自己感受。全文仅用2-3个比喻，且只用于主角无法理解的超自然现象。\n"
+        "2. 每句只陈述一个事实，不建立「不是A而是B」的对比关系。用短句推进，一段一层信息。\n"
         "3. 至少一个爽点/钩子。约3000字。直接输出正文。\n"
     )
 
@@ -770,8 +851,19 @@ def save_chapter_content(volume_id: int, chapter_id: int, content: str, outline:
 
     # Save content
     final_path = save_dir / f"ch_{chapter_id:03d}_final.md"
+
+    # ── 后处理模式检测 (Antislop 2025: 否定指令无法阻止, 需生成后扫描) ──
+    pattern_findings = scan_banned_patterns(reviewed_content)
+    pattern_report = format_pattern_report(pattern_findings)
+    save_content = reviewed_content + pattern_report if pattern_report else reviewed_content
+
     with open(final_path, 'w', encoding='utf-8') as f:
-        f.write(reviewed_content)
+        f.write(save_content)
+
+    if pattern_findings:
+        l1_count = len([f for f in pattern_findings if f["severity"] == "L1"])
+        l2_count = len([f for f in pattern_findings if f["severity"] == "L2"])
+        print(f"  [AI模式检测] 发现 {len(pattern_findings)} 处问题 (解释:{l1_count} 比喻:{l2_count} 其他:{len(pattern_findings)-l1_count-l2_count})")
 
     if final_needs_rewrite:
         print(f"[⚠] 第 {chapter_id} 章标记为需要检查")
