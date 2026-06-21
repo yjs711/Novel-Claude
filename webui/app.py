@@ -636,7 +636,16 @@ async def write_stream(request: Request):
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": prompt}
                         ],
-                        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+                        extra_body={
+                            "chat_template_kwargs": {"enable_thinking": False},
+                            # DRY采样器: 抑制「不是而是」等自回归重复序列(2025社区共识)
+                            "dry_multiplier": 0.6,
+                            "dry_base": 1.75,
+                            "dry_allowed_length": 2,
+                            # XTC采样器: 10%概率排除最高概率token,压制模板化比喻
+                            "xtc_probability": 0.1,
+                            "xtc_threshold": 0.1,
+                        },
                         timeout=600,  # HTTP 超时 10 分钟（本地模型预填充可能很慢）
                     )
                     for chunk in stream:
