@@ -571,8 +571,12 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
     if fs_ctx:
         prompt_parts.append(f"【伏笔提醒】{fs_ctx}\n")
 
-    # 极简约束 (5C Framework 2025: 规则少→创作熵预算大)
-    prompt_parts.append("【约束】短文推进，一段一层。比喻≤3个。不跳入配角内心。直接输出正文。\n")
+    # 核心约束 — 27B实测: 详细正向规则比极简规则有效(5C框架不适用小模型)
+    prompt_parts.append(
+        "【写作要求】\n"
+        "1. 每个场景用1个具体感官（气味/温度/声音/触觉）建立氛围。全文仅2-3个比喻用于超自然现象。\n"
+        "2. 每句只陈述一个事实。用短句推进，一段一层信息。至少一个爽点/钩子。约3000字。直接输出正文。\n"
+    )
 
     prompt = "\n".join(prompt_parts)
 
