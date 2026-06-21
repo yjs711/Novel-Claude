@@ -128,7 +128,7 @@ def inject_style_reference(base_prompt: str, style: str = "", genre: str = "",
 		if ref:
 			disclaimer = (
 				"---\n"
-				"**风格参照（学习节奏/句式/留白）：**\n"
+				"**【风格参照 — 只学叙事技法，严禁抄袭比喻句式】**\n"
 				"- 不抄袭比喻，学习的是\"怎么推进叙事\"\n\n"
 			)
 			parts.append(disclaimer + ref)
