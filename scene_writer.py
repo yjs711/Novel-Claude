@@ -160,44 +160,124 @@ BANNED_PATTERNS = [
     # L4: AI动作模板
     ("AI动作", r"指节发白|攥紧衣角|咬紧下唇|眼眶泛红|心脏漏拍|脊背发凉|镀上金边", "用独特的个人习惯动作替代通用模板。"),
     ("AI动作", r"命运的齿轮|这一切(刚刚开始|才刚开始|还远未结束)", "删掉，用具体情节推进替代口号。"),
-    # L5: POV锁定违规 — 上帝视角/旁白解释（网文核心铁律）
-    # 规则: 限知视角 = 只写视角角色的感官/心理，不跳入其他角色内心，不跳出来解说
-    ("POV泄露", r"(心中|心想|暗自|心道|感到|觉得|意识到|知道|明白|发现).{0,20}(他|她|他们|她们|[A-Z][一-龥]{1,3})(?!的)", "POV违规: 跳入了非主角角色的内心。改为外部表现(表情/动作/对话)。"),
-    ("旁白解说", r"原来.{0,30}(是|就是|不是|只是|因为|为了|用来|这样|那样|如此)", "旁白解释: 作者跳出来说明。改为角色通过感官发现。"),
-    ("旁白解说", r"(其实|事实上|说白了|简单来说|归根结底|毕竟.{0,20}(是|就|才))", "旁白评论: 删掉，让情节本身说话。"),
-    ("旁白评价", r"这是.{0,30}(道理|真理|规则|法则|规律|命运|宿命|结局|归宿|必然|注定|代价|惩罚)", "上帝视角评价: 删掉，读者自己能明白。"),
-    ("信息泄露", r"(他不知道|他没注意|他没发现|他还没意识到|他不知道的是|他还不知道|殊不知)", "视角角色不知道的信息不应写出。改为视角角色后续发现的线索。"),
-    ("作者评价", r"(笨嘴笨舌|伶牙俐齿|聪明绝顶|愚不可及|天生.{0,10}(的|就))", "作者评价形容词。改为具体的行为描写。"),
 ]
 
 
-def scan_banned_patterns(text: str) -> list[dict]:
+def _extract_protagonist_names(outline: dict = None, entity_list: list = None) -> list[str]:
+    """从大纲和实体列表中提取主角名字，用于POV检测排除误报。"""
+    names = []
+    # 从 entity_list 中找 role_type=protagonist 的角色
+    if entity_list:
+        entities = load_entity_cards(entity_list)
+        for char in entities.get("characters", []):
+            if char.get("role_type") == "protagonist" and char.get("name"):
+                names.append(char["name"])
+    # 回退：从 outline 的 entity_list 推断（第一个角色通常是主角）
+    if not names and outline:
+        el = outline.get("entity_list", [])
+        if el:
+            # entity_list 的元素可能是字符串或字典
+            first = el[0]
+            if isinstance(first, str):
+                names.append(first)
+            elif isinstance(first, dict) and first.get("name"):
+                names.append(first["name"])
+    # 最终回退：从核心蓝图中提取
+    if not names:
+        blueprint = load_setting_chunk("core_blueprint")
+        if blueprint:
+            content = blueprint.get("content", blueprint)
+            for char in content.get("character_cards", []):
+                if char.get("role_type") == "protagonist" and char.get("name"):
+                    names.append(char["name"])
+                    break
+    return names
+
+
+def scan_banned_patterns(text: str, protagonist_names: list[str] = None) -> list[dict]:
     """扫描文本中的禁用模式，返回标记列表。
-    每个标记包含: {pattern_type, severity(L1/L2/L3/L4), matched_text, position, suggestion}
+    protagonist_names: 主角名字列表，用于排除POV检测的误报（主角的「他知道」不应标记）
+    每个标记包含: {pattern_type, severity(L1/L2/L3/L4/L5), matched_text, position, suggestion}
     """
     import re
     findings = []
-    seen_spans = set()  # 去重：同一位置不重复报
+    seen_spans = set()
 
-    for idx, (ptype, regex, suggestion) in enumerate(BANNED_PATTERNS):
-        severity = f"L{min(idx // 4 + 1, 4)}"  # 前4个L1, 5-8 L2, 9-12 L3, 13+ L4
-        for m in re.finditer(regex, text):
-            start, end = m.start(), m.end()
-            # 检查是否与已有标记重叠
-            if any(start <= s_end and end >= s_start for s_start, s_end in seen_spans):
-                continue
-            seen_spans.add((start, end))
-            findings.append({
-                "type": ptype,
-                "severity": severity,
-                "matched": m.group()[:80],
-                "position": start,
-                "line": text[:start].count('\n') + 1,
-                "suggestion": suggestion,
-            })
+    # ── 构建动态POV模式（排除主角）──
+    pov_patterns = _build_pov_patterns(protagonist_names or [])
+
+    # 合并静态和动态模式
+    all_patterns = list(BANNED_PATTERNS) + pov_patterns
+
+    for idx, (ptype, regex, suggestion) in enumerate(all_patterns):
+        # severity: 前4个L1, 5-8 L2, 9-12 L3, 13-16 L4, 17+ L5
+        group = idx // 4
+        severity = f"L{min(group + 1, 5)}"
+        try:
+            for m in re.finditer(regex, text):
+                start, end = m.start(), m.end()
+                if any(start <= s_end and end >= s_start for s_start, s_end in seen_spans):
+                    continue
+                seen_spans.add((start, end))
+                findings.append({
+                    "type": ptype,
+                    "severity": severity,
+                    "matched": m.group()[:80],
+                    "position": start,
+                    "line": text[:start].count('\n') + 1,
+                    "suggestion": suggestion,
+                })
+        except re.error:
+            continue  # 跳过无效正则（如主角名为空导致的正则错误）
 
     findings.sort(key=lambda f: f["position"])
     return findings
+
+
+def _build_pov_patterns(protagonist_names: list[str]) -> list[tuple]:
+    """根据主角名构建POV/旁白检测模式。主角的「他知道/他感到」不标记（排除误报）。"""
+    import re
+
+    # 非主角角色名模式 — 从文本中检测到的中文人名
+    # 如果知道主角名，构建排除主角的模式
+    pov_mental_verbs = r"(心中|心想|暗自|心道|默念|思忖|暗想)"
+
+    patterns = []
+
+    if protagonist_names:
+        # 有主角名：构建排除主角的正则
+        protag_pattern = "|".join(re.escape(n) for n in protagonist_names)
+        # 心理动词 + 非主角角色（检测到的人名而非主角名）
+        # 思路：匹配「心想/感到+非主角名」，而非简单「知道+他」
+        patterns.append((
+            "POV泄露",
+            r"(心想|心道|暗自|思忖|默念|心中暗).{0,30}(?!" + protag_pattern + r")[A-Z一-鿿]{2,3}",
+            "POV违规: 跳入了非主角角色内心。改为外部表现。"
+        ))
+        # 「X感到/X觉得」where X is a named character that's not the protagonist
+        patterns.append((
+            "POV泄露",
+            r"(?!" + protag_pattern + r")[A-Z一-鿿]{2,3}.{0,10}(感到|觉得|意识到|发现)",
+            "POV违规: 非主角角色的内部感知。改为外部表现。"
+        ))
+    else:
+        # 无主角名：用保守模式（接受部分误报）
+        patterns.append((
+            "POV泄露",
+            r"([A-Z一-鿿]{2,3})(心想|心道|暗自|思忖).{0,30}",
+            "POV警告: 可能跳入配角内心。检查该角色是否为视角角色。"
+        ))
+
+    # 旁白解说（不需要主角名）
+    patterns.extend([
+        ("旁白解说", r"原来.{0,30}(是|就是|不是|只是|因为|为了)", "旁白解释。改为角色通过感官发现。"),
+        ("旁白解说", r"(其实|事实上|说白了|简单来说|归根结底)", "旁白评论。删掉，让情节说话。"),
+        ("旁白评价", r"这是.{0,30}(道理|真理|规则|法则|命运|宿命|结局|归宿|必然|注定|代价|惩罚)", "上帝视角评价。删掉。"),
+        ("信息泄露", r"(他不知道|他没注意|他没发现|他还没意识到|他不知道的是|殊不知)", "视角角色未知信息。改为后续发现线索。"),
+        ("作者评价", r"(笨嘴笨舌|伶牙俐齿|聪明绝顶|愚不可及|天生.{0,10}(的|就))", "作者评价形容词。改为具体行为描写。"),
+    ])
+
+    return patterns
 
 
 def format_pattern_report(findings: list[dict]) -> str:
@@ -498,13 +578,11 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
         prompt_parts.append(f"【伏笔提醒】{fs_ctx}\n")
 
     # 核心约束 — 放在 user prompt 而非 system prompt（27B 对用户指令遵从度更高）
-    # 全部正向表述（Semantic Gravity Wells 2025: 否定指令=激活被禁词）
+    # 核心约束 — 仅2条正向规则（Semantic Gravity Wells 2025: 每多一条否定/限制=多一个激活点）
     prompt_parts.append(
         "【写作要求】\n"
-        "1. 锁定主角视角：只写主角看到/听到/触到/闻到的。其他角色的想法通过表情/动作/对话透露，不跳入他们内心。\n"
-        "2. 让情节说话：设定和背景信息通过对话和场景细节自然呈现。每句只陈述一个事实，不建立「不是A而是B」的对比。\n"
-        "3. 用感官替代比喻：每个场景用1个具体感官（气味/温度/声音/触觉）建立氛围。全文仅2-3个比喻用于超自然现象。\n"
-        "4. 至少一个爽点/钩子。约3000字。直接输出正文。\n"
+        "1. 每个场景用1个具体感官（气味/温度/声音/触觉）建立氛围。全文仅2-3个比喻用于超自然现象。\n"
+        "2. 每句只陈述一个事实。用短句推进，一段一层信息。至少一个爽点/钩子。约3000字。直接输出正文。\n"
     )
 
     prompt = "\n".join(prompt_parts)
@@ -863,7 +941,9 @@ def save_chapter_content(volume_id: int, chapter_id: int, content: str, outline:
     final_path = save_dir / f"ch_{chapter_id:03d}_final.md"
 
     # ── 后处理模式检测 (Antislop 2025: 否定指令无法阻止, 需生成后扫描) ──
-    pattern_findings = scan_banned_patterns(reviewed_content)
+    # 提取主角名以避免POV误报
+    protagonist_names = _extract_protagonist_names(outline, entity_list)
+    pattern_findings = scan_banned_patterns(reviewed_content, protagonist_names)
     pattern_report = format_pattern_report(pattern_findings)
     save_content = reviewed_content + pattern_report if pattern_report else reviewed_content
 
