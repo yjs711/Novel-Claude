@@ -63,7 +63,7 @@
   },
   "generation": {
     "temperature": 0.85,
-    "temperature_planning": 0.6,
+    "temperature_planning": 0.3,
     "temperature_writing": 0.9,
     "temperature_reasoning": 0.5,
     "temperature_deai": 0.9,
