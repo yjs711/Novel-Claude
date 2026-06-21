@@ -200,6 +200,29 @@ def _build_fallback_overview(volume_id: int, chapter_id: int) -> str:
     return "\n".join(parts)
 
 
+def _build_style_anchor() -> str:
+    """风格锚定注入 — 基于 2025 论文证据:
+    Bohr 2025 (Show+Tell): 示例+规则 > 单独规则
+    Gao & Das 2024: BAD示例会适得其反（小模型无法正确区分正反例），只保留正面示例
+    Tang et al. 2025 (EMNLP): 对比格式本身 > 描述性文字
+
+    只注入正面真人原文示例，不展示任何AI写的比喻句（避免模型学习坏样本）。
+    示例来源: DSPy 训练集中的真人原文（余华《活着》/ 张小花）。
+    """
+    return """\n
+【风格参照 — 真人原文示例，只学习叙事方法不抄袭句子】
+
+示例1（白描 — 余华《活着》）:
+「它趴在地上，歪着脑袋吧哒吧哒掉眼泪，旁边一个赤膊男人蹲在地上霍霍地磨着牛刀。我不忍心看它被宰掉。走着走着心里总放不下这头牛，它知道自己要死了，脑袋底下都有一滩眼泪了。我赶紧往回走。蹲下把牛脚上的绳子解了，站起来后拍拍牛的脑袋。这牛还真聪明，知道自己不死了，一下子站起来，也不掉眼泪了。」
+技法: 用动作推进情绪（掉眼泪→不忍心→往回走→解绳子→拍脑袋），不用比喻，纯白描。
+
+示例2（口语节奏 — 张小花《史上第一混乱》）:
+「我真倒霉，真的。人家穿越称雄称王，我却只能被反穿越。昨天刘老六领回来一个高壮的、穿得跟个土鳖似的人，介绍说这是荆轲。第二个客户是个胖子，他叫秦始皇——我从来没想过秦始皇是一个胖子。」
+技法: 口语节奏+第一人称吐槽推进，不使用文绉绉的书面比喻。
+
+请参照以上真人叙事手法写作：用动作、感官、对话推进剧情，拒绝装饰性比喻。"""
+
+
 def load_writing_guide(volume_id: int) -> Optional[str]:
     """Load writing guide for the volume if exists."""
     path = Path(VOLUMES_DIR) / f"vol_{volume_id:02d}_writing_guide.json"
@@ -333,12 +356,19 @@ def build_chapter_prompt(volume_id: int, chapter_id: int, chapter_title: str = N
     if fs_ctx:
         prompt_parts.append(f"【伏笔提醒】{fs_ctx}\n")
 
-    # Minimal constraints — the model needs freedom, not a rulebook
+    # 核心约束 — 放在 user prompt 而非 system prompt（27B 对用户指令遵从度更高）
     prompt_parts.append(
-        "【要求】承接前章情绪，本章至少有一个爽点/钩子。约3000字。直接输出正文。\n"
+        "【写作要求】\n"
+        "1. 禁止「像/仿佛/如同/犹如/宛如」引导的明喻。全文最多用3个比喻，且只用于主角无法理解的超自然现象。用具体感官（触觉/温度/声音/气味）替代比喻。\n"
+        "2. 禁止套话比喻（石子/涟漪/浆糊/流星/利剑/松树/火苗/扁舟/针扎/电流/婴儿/心跳/凝固的空气/镀上金边/出鞘的剑），禁止两个比喻连用。\n"
+        "3. 至少一个爽点/钩子。约3000字。直接输出正文。\n"
     )
 
     prompt = "\n".join(prompt_parts)
+
+    # 风格锚定注入 — 基于 Bohr 2025 (Show+Tell) + Gao 2024 (Contrastive ICL)
+    # 放在 user prompt 中（对比示例+规则 > 单独规则，EMNLP 2025）
+    prompt += _build_style_anchor()
 
     # Inject story engine constraints (题材×风格 — 27B可执行的实战约束)
     try:
