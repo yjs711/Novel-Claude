@@ -312,60 +312,54 @@ def load_world_setting() -> dict:
 
 
 def _build_fallback_overview(volume_id: int, chapter_id: int) -> str:
-    """当章节细纲缺失时，从世界观文件和卷大纲构建回退概览。
-    确保新手项目（init 后未 plan）也能生成第一章。"""
-    parts = []
-    # 1. 从一句话梗概获取故事核心
-    one_sentence = load_setting_chunk("one_sentence")
-    if one_sentence:
-        content = one_sentence.get("content", one_sentence)
-        sentence = content.get("one_sentence", "")
-        theme = content.get("theme", "")
-        if sentence:
-            parts.append(f"故事核心: {sentence}")
-        if theme:
-            parts.append(f"主题: {theme}")
+    """当章节细纲缺失时，从世界观文件提取结构化要点（而非叙事段落）。
+    基于 NovelForge 2025 设计原则: 结构化数据→正文，叙事文本会通过 in-context learning 污染风格。"""
+    parts = ["【本章大纲】"]
 
-    # 2. 从故事大纲获取概览
-    story_outline = load_setting_chunk("story_outline")
-    if story_outline:
-        content = story_outline.get("content", story_outline)
-        overview = content.get("overview", "")
-        if overview:
-            parts.append(f"故事背景: {overview[:500]}")
-
-    # 3. 从卷大纲获取本章定位
-    vol_outline = load_volume_outline(volume_id)
-    if vol_outline:
-        vol_overview = vol_outline.get("overview", "")
-        if vol_overview:
-            parts.append(f"本卷目标: {vol_overview[:300]}")
-
-    # 4. 从世界观获取世界规则
-    world_setting = load_setting_chunk("world_setting")
-    if world_setting:
-        content = world_setting.get("content", world_setting)
-        world_view = content.get("world_view", "")
-        if world_view:
-            parts.append(f"世界观: {world_view[:300]}")
-        factions = content.get("major_power_camps", [])
-        if factions:
-            faction_names = [f.get("name", "") for f in factions[:3]]
-            parts.append(f"主要势力: {', '.join(faction_names)}")
-
-    # 5. 从核心蓝图获取角色
+    # 1. 主角 + 当前状态（1行）
     blueprint = load_setting_chunk("core_blueprint")
     if blueprint:
         content = blueprint.get("content", blueprint)
         chars = content.get("character_cards", [])
         if chars:
-            main_char = chars[0]
-            parts.append(f"主角: {main_char.get('name', '?')} — {main_char.get('description', '')[:100]}")
+            mc = chars[0]
+            role = mc.get("role_type", "")
+            desc = mc.get("description", "")[:60]
+            parts.append(f"主角: {mc.get('name','?')} ({role}) — {desc}")
 
-    if not parts:
-        return f"第{chapter_id}章，故事开篇。请根据小说类型和风格自然展开。"
+    # 2. 世界规则（1行关键规则）
+    world_setting = load_setting_chunk("world_setting")
+    if world_setting:
+        content = world_setting.get("content", world_setting)
+        world_view = content.get("world_view", "")[:120]
+        if world_view:
+            parts.append(f"世界: {world_view}")
 
-    parts.append(f"本章为第{chapter_id}章{'（开篇第一章）' if chapter_id == 1 else ''}，请根据以上设定自然展开故事。")
+    # 3. 当前势力（1行）
+    if world_setting:
+        factions = content.get("major_power_camps", [])
+        if factions:
+            names = [f.get("name","") for f in factions[:3]]
+            parts.append(f"势力: {', '.join(names)}")
+
+    # 4. 故事核心（1行）
+    one_sentence = load_setting_chunk("one_sentence")
+    if one_sentence:
+        content = one_sentence.get("content", one_sentence)
+        sentence = content.get("one_sentence", "")
+        if sentence:
+            parts.append(f"核心: {sentence}")
+
+    # 5. 故事背景（压缩到100字以内，只取开头）
+    story_outline = load_setting_chunk("story_outline")
+    if story_outline:
+        content = story_outline.get("content", story_outline)
+        overview = content.get("overview", "")[:80]
+        if overview:
+            parts.append(f"背景: {overview}")
+
+    if len(parts) == 1:
+        return f"【本章大纲】\n第{chapter_id}章，请根据小说类型和风格自然展开。"
     return "\n".join(parts)
 
 
