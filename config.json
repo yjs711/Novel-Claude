@@ -56,7 +56,7 @@
     "progress_chunk_size": 1000
   },
   "review": {
-    "deep_review_enabled": false,
+    "deep_review_enabled": true,
     "auto_fix_title": true,
     "word_count_check": true,
     "deep_review_interval": 10
